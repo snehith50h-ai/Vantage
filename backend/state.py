@@ -12,6 +12,14 @@ class HackathonState(TypedDict):
     problem_statement: str
     scraped_history: List[Dict[str, str]]
     precedent_intelligence: Optional[Dict[str, Any]]
+    github_intel: Optional[Dict[str, Any]] # New
     jury_profile: Optional[str]
     feasibility_analysis: Optional[Dict[str, Any]]
+    scope_cut_analysis: Optional[Dict[str, Any]]
+    architecture_diagrams: Optional[str]
+    judge_score: Optional[Dict[str, Any]]
+    risk_assessment: Optional[Dict[str, Any]] # New
+    execution_timeline: Optional[Dict[str, Any]] # New
+    business_model: Optional[Dict[str, Any]] # New
+    ux_design_system: Optional[Dict[str, Any]] # New
     final_blueprint: Annotated[dict, update_dict]
