@@ -32,6 +32,10 @@ def business_node(state: HackathonState) -> dict:
         )
         
         res = llm.invoke(prompt).content
+        if isinstance(res, list):
+            res = res[0] if isinstance(res[0], str) else res[0].get("text", "")
+        res = str(res).strip()
+        
         if res.startswith("```json"):
             res = res[7:-3].strip()
         elif res.startswith("```"):

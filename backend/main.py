@@ -173,7 +173,12 @@ async def strategize(req: HackathonRequest):
             "precedent_intelligence": final_state.get("precedent_intelligence"),
             "jury_profile": final_state.get("jury_profile"),
             "feasibility_analysis": final_state.get("feasibility_analysis"),
-            "final_blueprint": final_state.get("final_blueprint")
+            "final_blueprint": final_state.get("final_blueprint"),
+            "github_intel": final_state.get("github_intel"),
+            "risk_assessment": final_state.get("risk_assessment"),
+            "execution_timeline": final_state.get("execution_timeline"),
+            "ux_design_system": final_state.get("ux_design_system"),
+            "business_model": final_state.get("business_model")
         }
     except Exception as e:
         print(f"Error during graph execution: {e}")
