@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Mermaid Test</title>
+</head>
+<body style="background:#111; color:#fff;">
+  <div id="chart-container"></div>
+  <div id="log-output"></div>
+
+  <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.esm.min.mjs';
+
+    const log = (msg) => {
+      console.log(msg);
+      document.getElementById('log-output').innerHTML += `<p>${msg}</p>`;
+    };
+
+    mermaid.initialize({
+      startOnLoad: false,
+      theme: 'dark',
+      securityLevel: 'loose'
+    });
+
+    const rawChart = `graph TD
+    subgraph Client/Edge ["Client & Edge Layer (Sub-surface & Surface Nodes)"]
+        Node1["Edge Node A: MEMS Tilt & GNSS <br/> (ESP32-S3 + TinyML Quantized Model)"]
+        Node2["Edge Node B: Acoustic & Vibration <br/> (STM32WBA + Edge Impulse)"]
+        Gateway["Solar-Powered LoRaWAN Gateway <br/> (Raspberry Pi CM4 + Edge MQTT Broker)"]
+        MobileApp["Field Technician PWA <br/> (React Native / Offline-First IndexedDB)"]
+        
+        Node1 -.->|LoRaWAN 865-867MHz| Gateway
+        Node2 -.->|LoRaWAN 865-867MHz| Gateway
+    end
+
+    subgraph Ingress/Gateway ["Ingress & API Gateway Layer"]
+        APIGateway["Kong API Gateway <br/> (mTLS Termination & Rate Limiting)"]
+        MQTTBroker["EMQX Enterprise MQTT Broker <br/> (WebSocket/TCP Ingest Pipeline)"]
+        
+        Gateway ==>|HTTPS / REST| APIGateway
+        Gateway ==>|MQTT over TLS| MQTTBroker
+    end
+
+    subgraph Event/Queue ["Event Streaming & Message Bus"]
+        Kafka["Apache Kafka Cluster <br/> (Topics: raw-telemetry, anomaly-events, alerts)"]
+        
+        APIGateway -->|Produce Events| Kafka
+        MQTTBroker -->|Stream Telemetry| Kafka
+    end
+
+    subgraph Microservices ["Microservices Layer (Kubernetes Orchestrated)"]
+        IngestService["Telemetry Ingestion & Validation Service <br/> (Go / Fiber)"]
+        AIInferenceEngine["AI Prognostics & Propagation Engine <br/> (Python / FastAPI / PyTorch / ONNX)"]
+        AlertService["Notification & Escalation Engine <br/> (Node.js / Twilio / WebSockets)"]
+        GISService["Spatial Analysis & Mapping Engine <br/> (Go / GDAL / Turf.js)"]
+
+        Kafka -->|Consume Raw Data| IngestService
+        Kafka -->|Consume Telemetry/Anomalies| AIInferenceEngine
+        Kafka -->|Consume Trigger Events| AlertService
+        Kafka -->|Consume Spatial Metrics| GISService
+        
+        AIInferenceEngine -->|Publish Anomaly Predict| Kafka
+    end
+
+    subgraph Persistence/Cache ["Persistence & Caching Layer"]
+        Timescale["TimescaleDB / PostgreSQL <br/> (Time-Series Telemetry & Hypertables)"]
+        PostGIS["PostGIS Spatial Database <br/> (Mine Grid Geofences & Topography)"]
+        Redis["Redis Enterprise Cluster <br/> (Real-time Sensor State & Rate Limits)"]
+        S3["MinIO / AWS S3 Object Store <br/> (Raw Model Checkpoints & Audio Clips)"]
+
+        IngestService -->|Write Time-Series| Timescale
+        AIInferenceEngine -->|Read/Write State| Redis
+        GISService -->|Spatial Queries| PostGIS
+        AIInferenceEngine -->|Store Artifacts| S3
+    end
+
+    %% Cross-cutting links
+    MobileApp ==>|HTTPS/WSS| APIGateway`;
+
+    try {
+      log('Attempting render...');
+      const { svg } = await mermaid.render('test-id', rawChart);
+      log('Render success! SVG length: ' + svg.length);
+      document.getElementById('chart-container').innerHTML = svg;
+    } catch (err) {
+      log('Render failed with error: ' + err.message);
+      console.error(err);
+    }
+  </script>
+</body>
+</html>

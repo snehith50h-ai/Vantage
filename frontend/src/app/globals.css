@@ -1,0 +1,137 @@
+@import "tailwindcss";
+
+@theme {
+  --color-black: #000000;
+  --color-sheet: #EEF0F4;
+  --color-sheet-card: #F7F8FA;
+  --color-sheet-tint: #CFE0EE;
+  
+  --color-ink-dark: #0B0B10;
+  --color-ink-muted: #8A8E99;
+  
+  --color-text-on-dark: #F2F2F5;
+  --color-muted-on-dark: #A8A3B5;
+  
+  --color-accent-pink: #FF5C93;
+  --color-accent-pink-dark: #FF3D8B;
+  --color-accent-magenta: #C02BD6;
+  --color-deep-purple: #5B1A7A;
+  
+  --color-link-blue: #1F3A8A;
+  --color-pill-blue: #A9C7E8;
+  
+  --font-mono: var(--font-jetbrains);
+  --font-sans: var(--font-inter);
+}
+
+@layer utilities {
+  .text-gradient {
+    background-image: linear-gradient(
+      -45deg,
+      #FF107A,
+      #7A10FF,
+      #FF5C93,
+      #00E5FF
+    );
+    background-size: 150% 150%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    animation: aurora-text 6s linear infinite;
+  }
+
+  @keyframes aurora-text {
+    0% { filter: hue-rotate(0deg); }
+    100% { filter: hue-rotate(360deg); }
+  }
+  
+  .bg-ribbon-gradient {
+    background-image: linear-gradient(90deg, #FF4FA3, #B82FCF, #3A0F52);
+  }
+  
+  .bg-dotted-dark {
+    background-image: radial-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px);
+    background-size: 32px 32px;
+  }
+  
+  .text-shadow-glow {
+    text-shadow: 0 0 20px rgba(192, 43, 214, 0.5);
+  }
+
+  .markdown-content h1, .markdown-content h2, .markdown-content h3 {
+    color: var(--color-text-on-dark);
+    margin-top: 1.5em;
+    margin-bottom: 0.5em;
+    font-weight: 700;
+  }
+  
+  .markdown-content h2 {
+    font-size: 1.5em;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    padding-bottom: 0.3em;
+  }
+  
+  .markdown-content p {
+    margin-bottom: 1em;
+  }
+  
+  .markdown-content ul {
+    list-style-type: disc;
+    padding-left: 1.5em;
+    margin-bottom: 1em;
+  }
+  
+  .markdown-content table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 1em;
+  }
+  
+  .markdown-content th, .markdown-content td {
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 0.75em;
+    text-align: left;
+  }
+  
+  .markdown-content th {
+    background: rgba(255, 255, 255, 0.05);
+  }
+  
+  .markdown-content pre {
+    background: rgba(0, 0, 0, 0.5);
+    padding: 1em;
+    border-radius: 0.5em;
+    overflow-x: auto;
+    margin-bottom: 1em;
+  }
+  
+  .markdown-content code {
+    background: rgba(255, 255, 255, 0.1);
+    padding: 0.2em 0.4em;
+    border-radius: 0.25em;
+    font-size: 0.9em;
+  }
+  
+  .markdown-content pre code {
+    background: transparent;
+    padding: 0;
+  }
+}
+
+html, body {
+  background-color: var(--color-black);
+  color: var(--color-text-on-dark);
+  font-family: var(--font-sans);
+  overscroll-behavior-y: auto;
+  scroll-behavior: smooth;
+}
+
+body {
+  overflow-x: hidden;
+  min-height: 100vh;
+}
+
+::selection {
+  background: var(--color-accent-pink);
+  color: #fff;
+}
