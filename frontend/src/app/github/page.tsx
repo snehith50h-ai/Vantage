@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { GitBranch, GitCommit, Search, GitPullRequest, AlertTriangle, ShieldCheck } from "lucide-react";
+import { apiFetch } from "@/lib/api";
 
 export default function GithubIntelPage() {
   const [repoUrl, setRepoUrl] = useState("https://github.com/team/hackathon-project");
@@ -20,9 +21,8 @@ export default function GithubIntelPage() {
     setError("");
     setResult(null);
     try {
-      const response = await fetch("http://localhost:8000/api/github/analyze", {
+      const response = await apiFetch("/api/github/analyze", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           repo_url: repoUrl,
           architecture_contract: archContract,

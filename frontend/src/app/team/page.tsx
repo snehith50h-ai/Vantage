@@ -5,6 +5,7 @@ import LenisProvider from "@/components/LenisProvider";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { Users, Activity, Target, ShieldAlert, Sparkles, Plus, Trash2 } from "lucide-react";
+import { apiFetch } from "@/lib/api";
 
 interface TeamMember {
   name: string;
@@ -55,9 +56,8 @@ export default function TeamProfilePage() {
     setProfile(null);
 
     try {
-      const response = await fetch("http://localhost:8000/api/team/profile", {
+      const response = await apiFetch("/api/team/profile", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           team_name: teamName,
           members: members.filter(m => m.name.trim() !== ""),

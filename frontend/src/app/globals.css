@@ -44,6 +44,109 @@
     0% { filter: hue-rotate(0deg); }
     100% { filter: hue-rotate(360deg); }
   }
+
+  .aurora-flow-gradient {
+    background: linear-gradient(
+      135deg,
+      #FF107A 0%,
+      #7A10FF 25%,
+      #00E5FF 50%,
+      #FF5C93 75%,
+      #7A10FF 90%,
+      #FF107A 100%
+    );
+    background-size: 300% 300%;
+    animation: aurora-shift 7s ease infinite;
+  }
+
+  @keyframes aurora-shift {
+    0% {
+      background-position: 0% 50%;
+    }
+    50% {
+      background-position: 100% 50%;
+    }
+    100% {
+      background-position: 0% 50%;
+    }
+  }
+
+  /* Wide, thick ambient diffused halo covering area around the entire rectangular box */
+  .aurora-halo-ambient {
+    position: absolute;
+    inset: -8px;
+    border-radius: 1.65rem;
+    filter: blur(16px);
+    opacity: 0.55;
+    pointer-events: none;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* Medium bloom hugging the perimeter edges and blended corners smoothly */
+  .aurora-halo-bloom {
+    position: absolute;
+    inset: -2px;
+    border-radius: 1.45rem;
+    filter: blur(6px);
+    opacity: 0.75;
+    pointer-events: none;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* Crisp all-edge gradient border wrapper covering all 4 sides and corners */
+  .aurora-box-wrapper {
+    position: relative;
+    padding: 2px;
+    border-radius: 1.375rem;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .aurora-border {
+    position: relative;
+  }
+  
+  .aurora-border::before {
+    content: "";
+    position: absolute;
+    inset: -2px;
+    border-radius: inherit;
+    background: linear-gradient(
+      90deg,
+      #FF107A,
+      #7A10FF,
+      #FF5C93,
+      #00E5FF,
+      #FF107A
+    );
+    background-size: 200% auto;
+    animation: aurora-border-anim 4s linear infinite;
+    z-index: -1;
+    filter: blur(4px);
+    opacity: 0.8;
+  }
+
+  .aurora-border::after {
+    content: "";
+    position: absolute;
+    inset: -1px;
+    border-radius: inherit;
+    background: linear-gradient(
+      90deg,
+      #FF107A,
+      #7A10FF,
+      #FF5C93,
+      #00E5FF,
+      #FF107A
+    );
+    background-size: 200% auto;
+    animation: aurora-border-anim 4s linear infinite;
+    z-index: -1;
+  }
+
+  @keyframes aurora-border-anim {
+    0% { background-position: 0% center; }
+    100% { background-position: 200% center; }
+  }
   
   .bg-ribbon-gradient {
     background-image: linear-gradient(90deg, #FF4FA3, #B82FCF, #3A0F52);
@@ -52,6 +155,10 @@
   .bg-dotted-dark {
     background-image: radial-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px);
     background-size: 32px 32px;
+  }
+  
+  .bg-gemini-light {
+    background: radial-gradient(circle at center, #EAF2F9 0%, #FFFFFF 60%);
   }
   
   .text-shadow-glow {
@@ -115,6 +222,14 @@
   .markdown-content pre code {
     background: transparent;
     padding: 0;
+  }
+
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+  .scrollbar-none {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
   }
 }
 

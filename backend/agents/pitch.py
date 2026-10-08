@@ -36,22 +36,10 @@ def pitch_node(state: HackathonState) -> dict:
             {"title": "Why Us?", "content": "Highly aligned with the jury's focus on scalability and social impact."}
         ]})
 
-    if isinstance(response, list):
-        response = response[0] if isinstance(response[0], str) else response[0].get("text", "")
-    if not isinstance(response, str):
-        response = str(response)
-        
-    # Strip markdown if present
-    response = response.strip()
-    if response.startswith("```json"):
-        response = response[7:-3].strip()
-    elif response.startswith("```"):
-        response = response[3:-3].strip()
-    
-    try:
-        pitch_outline = json.loads(response)
-    except:
-        pitch_outline = {"slides": [{"title": "Error", "content": "Could not parse pitch JSON."}]}
+    from utils import parse_json_robustly, generate_dynamic_pitch_fallback
+    pitch_outline = parse_json_robustly(response)
+    if not pitch_outline or not isinstance(pitch_outline, dict):
+        pitch_outline = generate_dynamic_pitch_fallback(problem, state.get("organizer_name", "Hackathon"), profile)
     
     final_bp = state.get("final_blueprint", {})
     if not final_bp:

@@ -5,6 +5,7 @@ import LenisProvider from "@/components/LenisProvider";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { Activity, ShieldAlert, Crosshair, AlertTriangle, Zap, CheckCircle2 } from "lucide-react";
+import { apiFetch } from "@/lib/api";
 
 interface HealthScores {
   technical_readiness: number;
@@ -37,9 +38,8 @@ export default function XRayPage() {
     setResult(null);
 
     try {
-      const response = await fetch("http://localhost:8000/api/project/xray", {
+      const response = await apiFetch("/api/project/xray", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           project_contract: projectContract,
           current_progress: currentProgress,

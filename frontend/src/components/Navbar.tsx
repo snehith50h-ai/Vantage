@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { ChevronDown, Grip, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
+import UserMenu from "@/components/auth/UserMenu";
 
 export default function Navbar() {
   return (
@@ -54,7 +55,7 @@ export default function Navbar() {
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-accent-pink/15 text-accent-pink border border-accent-pink/40 hover:bg-accent-pink hover:text-black transition-all font-bold shadow-[0_0_15px_rgba(255,92,147,0.3)] animate-pulse"
         >
           <Sparkles size={13} />
-          AI STUDIO PLAYGROUND
+          PLAYGROUND
         </Link>
 
         <div className="flex items-center gap-1 cursor-pointer hover:text-text-on-dark transition-colors">
@@ -73,17 +74,12 @@ export default function Navbar() {
         
         <div className="flex items-center gap-3 ml-1">
           <Link 
-            href="/login" 
-            className="px-4 py-2 rounded-md bg-pill-blue/10 text-pill-blue hover:bg-pill-blue/20 transition-all font-semibold hover:-translate-y-[1px]"
-          >
-            LOG IN
-          </Link>
-          <Link 
             href="/playground" 
             className="px-4 py-2 rounded-md bg-accent-pink text-black hover:bg-white transition-all font-semibold hover:-translate-y-[1px]"
           >
             TRY PLAYGROUND
           </Link>
+          <UserMenu compact={true} />
         </div>
       </div>
     </nav>

@@ -5,6 +5,7 @@ import LenisProvider from "@/components/LenisProvider";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { Hammer, Zap, GitCommit, CheckSquare, Server, Link2, AlertCircle } from "lucide-react";
+import { apiFetch } from "@/lib/api";
 
 interface Task {
   title: string;
@@ -39,9 +40,8 @@ export default function ExecutionEnginePage() {
     setResult(null);
 
     try {
-      const response = await fetch("http://localhost:8000/api/project/execution", {
+      const response = await apiFetch("/api/project/execution", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           core_workflow: coreWorkflow,
           tech_stack: techStack,

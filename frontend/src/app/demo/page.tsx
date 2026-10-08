@@ -7,6 +7,7 @@ import LenisProvider from "@/components/LenisProvider";
 import Footer from "@/components/Footer";
 
 import ArchitectureSection from "@/components/ArchitectureSection";
+import { apiFetch } from "@/lib/api";
 
 export default function DemoPage() {
   const [organizerName, setOrganizerName] = useState("");
@@ -23,11 +24,8 @@ export default function DemoPage() {
     setResult(null);
 
     try {
-      const response = await fetch("http://localhost:8000/api/strategize", {
+      const response = await apiFetch("/api/strategize", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
         body: JSON.stringify({
           organizer_name: organizerName,
           problem_statement: problemStatement,
@@ -74,7 +72,7 @@ export default function DemoPage() {
               <div className="flex items-center gap-2.5">
                 <span className="w-2 h-2 rounded-full bg-accent-pink animate-ping"></span>
                 <span className="text-xs font-mono text-white">
-                  <strong>PRO PLAYGROUND:</strong> Google AI Studio Multi-Agent Playground is now live!
+                  <strong>PRO PLAYGROUND:</strong> Autonomous Multi-Agent Playground is now live!
                 </span>
               </div>
               <Link

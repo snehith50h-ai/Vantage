@@ -2,9 +2,9 @@ import AuthForm from "@/components/auth/AuthForm";
 import { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Log In | Vantage AI",
+  title: "Sign Up | Vantage AI",
 };
 
-export default function LoginPage() {
-  return <AuthForm initialMode="login" />;
+export default function SignupPage() {
+  return <AuthForm initialMode="signup" />;
 }

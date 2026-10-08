@@ -24,9 +24,10 @@ def search_duckduckgo(query: str, max_results: int = 4):
     results = []
     try:
         resp = httpx.get(
-            f"https://html.duckduckgo.com/html/?q={httpx.URL(query)}",
+            "https://html.duckduckgo.com/html/",
+            params={"q": query},
             headers=headers,
-            timeout=6.0,
+            timeout=8.0,
             follow_redirects=True
         )
         if resp.status_code == 200:
@@ -53,9 +54,11 @@ def scraper_node(state: HackathonState) -> dict:
     
     print(f"Scraping past hackathon editions, winners, and PPT precedents for: {organizer}")
     
-    # 1. Live Web Search across multiple targeted queries
-    query1 = f"{organizer} hackathon winners projects PPT past edition"
-    query2 = f"{organizer} winning teams solutions github devpost"
+    # 1. Live Web Search across multiple targeted queries focusing on organizer and problem
+    query1 = f"{organizer} hackathon winners projects"
+    # Extract first 6-8 keywords from problem statement for realistic technical search
+    prob_keywords = " ".join([w for w in re.sub(r'[^a-zA-Z0-9 ]', '', problem).split() if len(w) > 3][:6])
+    query2 = f"{prob_keywords} architecture github solutions" if prob_keywords else f"{organizer} winning teams github"
     
     web_results = search_duckduckgo(query1, max_results=4)
     if len(web_results) < 2:
@@ -143,11 +146,14 @@ def scraper_node(state: HackathonState) -> dict:
         pass
         
     mock_scraped_data = [
-        {"project_name": s["title"][:40], "description": s["snippet"][:120]}
+        {"project_name": s["title"][:40], "description": s["snippet"][:120], "url": s.get("url", "")}
         for s in web_results[:3]
     ] if web_results else [
-        {"project_name": "Past Winner Benchmark", "description": precedent_intel.get("past_editions_analyzed", "")[:120]}
+        {"project_name": "Past Winner Benchmark", "description": precedent_intel.get("past_editions_analyzed", "")[:120], "url": ""}
     ]
+    
+    # Store queries in precedent_intel so frontend can display them
+    precedent_intel["search_queries_used"] = [query1, query2]
     
     return {
         "scraped_history": mock_scraped_data,

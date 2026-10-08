@@ -40,9 +40,9 @@ export default function DiagnosticsTab({ trace, meta }: DiagnosticsTabProps) {
 
         <div className="p-4 rounded-xl bg-[#12121A] border border-white/10 flex items-center justify-between">
           <div>
-            <span className="text-[10px] font-mono text-white/40 uppercase">LLM Engine</span>
+            <span className="text-[10px] font-mono text-white/40 uppercase">Intelligence Engine</span>
             <div className="text-sm font-bold font-mono text-white mt-0.5 truncate max-w-[140px]">
-              {meta.model_used || "gemini-3.5-flash-lite"}
+              Vantage Neural Swarm
             </div>
           </div>
           <Cpu className="w-5 h-5 text-accent-magenta" />

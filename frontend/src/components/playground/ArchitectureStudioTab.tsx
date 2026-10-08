@@ -18,6 +18,7 @@ import DrawioEditor from "@/components/DrawioEditor";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { extractMermaidCode } from "@/utils/mermaidToXml";
+import { apiFetch } from "@/lib/api";
 
 interface ArchitectureStudioTabProps {
   architecture: string;
@@ -64,9 +65,8 @@ export default function ArchitectureStudioTab({
     setError("");
 
     try {
-      const response = await fetch("http://localhost:8000/api/edit-architecture", {
+      const response = await apiFetch("/api/edit-architecture", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           current_architecture: architecture,
           edit_instructions: promptToUse,

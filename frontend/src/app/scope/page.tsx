@@ -5,6 +5,7 @@ import LenisProvider from "@/components/LenisProvider";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { Scissors, Zap, AlertTriangle, Crosshair, Sparkles, CheckCircle2, Clock, Ban } from "lucide-react";
+import { apiFetch } from "@/lib/api";
 
 interface ProjectContract {
   core_workflow: string;
@@ -38,9 +39,8 @@ export default function ScopeAssassinPage() {
     setResult(null);
 
     try {
-      const response = await fetch("http://localhost:8000/api/project/scope", {
+      const response = await apiFetch("/api/project/scope", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           project_idea: projectIdea,
           time_limit_hours: timeLimit,

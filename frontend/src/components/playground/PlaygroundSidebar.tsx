@@ -1,22 +1,25 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
-  Sliders,
+  History,
+  Folder,
+  Plus,
   Settings,
+  Clock,
+  Filter,
+  Trash2,
+  FolderPlus,
   Sparkles,
-  Bot,
-  Layers,
-  Bookmark,
-  ChevronDown,
-  ChevronRight,
-  Flame,
-  Shield,
-  Database,
-  CheckSquare,
-  Square,
-  HelpCircle,
+  Search,
+  X,
+  ExternalLink,
+  Cpu,
+  Layers
 } from "lucide-react";
+import { apiFetch, setToken } from "@/lib/api";
+import { useRouter } from "next/navigation";
+import { useToast } from "@/components/ui/Toast";
 
 export interface PresetItem {
   id: string;
@@ -28,82 +31,7 @@ export interface PresetItem {
   tag: string;
 }
 
-export const PRESETS: PresetItem[] = [
-  {
-    id: "hack-with-hyderabad",
-    name: "Hack with Hyderabad 3.0: Urban Flood Response",
-    organizer: "Hack with Hyderabad 3.0",
-    problem:
-      "Build an AI-powered offline-first emergency response and volunteer routing mesh system for urban flood management and flash crisis relief in Hyderabad.",
-    constraints:
-      "Must operate with zero cellular network using peer-to-peer ad-hoc WiFi/Bluetooth mesh. Sub-second geo-spatial alerts for first responders.",
-    persona: "Hack with Hyderabad Senior Technical Jury",
-    tag: "CivicTech / Disaster AI",
-  },
-  {
-    id: "sih-coal-mine",
-    name: "SIH 2026: Mine Subsidence Monitoring",
-    organizer: "Smart India Hackathon (SIH)",
-    problem:
-      "Problem Statement ID 26025: Development of an AI-enabled Low Cost Real Time Mine Subsidence Monitoring, Prediction and Early Warning System for Underground Coal Mines in India.",
-    constraints:
-      "Must work reliably in underground bandwidth-constrained environments. Total sensor node cost under ₹15,000 ($180). Audible and visual sirens with fail-safe manual override.",
-    persona: "SIH / Smart India Hackathon Technical Evaluator",
-    tag: "GovTech / IoT",
-  },
-  {
-    id: "ethglobal-zk-intent",
-    name: "ETHGlobal: Autonomous ZK AI Router",
-    organizer: "ETHGlobal",
-    problem:
-      "Build a cross-chain autonomous liquidity routing engine using decentralized AI intent solvers and zero-knowledge validity proofs.",
-    constraints:
-      "Sub-second execution quotes, decentralized relayer network, gas-optimized smart contracts on Arbitrum & Base, zero centralized custody.",
-    persona: "Cypherpunk / Web3 Auditor",
-    tag: "Web3 / DeFi",
-  },
-  {
-    id: "hackmit-drone-swarm",
-    name: "HackMIT: Disaster Response Drone Mesh",
-    organizer: "HackMIT",
-    problem:
-      "Autonomous search-and-rescue aerial drone swarm operating over ad-hoc peer-to-peer LoRa mesh networks in GPS-denied catastrophe zones.",
-    constraints:
-      "Edge computer vision inferencing on Jetson Nano, resilient to 40% node loss, decentralized swarm leader election.",
-    persona: "Enterprise Architect",
-    tag: "Robotics / Edge AI",
-  },
-  {
-    id: "google-solution-crops",
-    name: "Google Solution: Crop Disease Audio AI",
-    organizer: "Google Solution Challenge",
-    problem:
-      "Offline mobile edge AI application for instant crop leaf pathology diagnosis with localized native voice audio synthesis for rural farmers.",
-    constraints:
-      "Completely offline on low-end Android hardware, model quantized under 15MB, voice guidance in 8 regional dialects.",
-    persona: "Tier-1 Silicon Valley VC",
-    tag: "Social Impact / AI",
-  },
-];
-
-const PERSONA_TEMPLATES: { label: string; text: string }[] = [
-  {
-    label: "Enterprise Architect",
-    text: "You are an Elite Enterprise Technical Architect. Enforce strict microservices boundaries, decoupled asynchronous message brokers, high-throughput caching tiers, and zero single points of failure.",
-  },
-  {
-    label: "SIH Evaluator",
-    text: "You are a Senior Judge for the Smart India Hackathon. Focus relentlessly on physical feasibility, ultra-low cost bill of materials, edge resilience in rural/underground zones, and rock-solid fail-safes.",
-  },
-  {
-    label: "Tier-1 VC Judge",
-    text: "You are a General Partner at a Tier-1 Silicon Valley VC firm. Evaluate unfair defensibility, scalability to 100M users, viral distribution vectors, and massive technological moat.",
-  },
-  {
-    label: "Web3 / Cypherpunk",
-    text: "You are a Cypherpunk security auditor. Prioritize trustless architecture, cryptographic verification, decentralized consensus, and absence of central choke points.",
-  },
-];
+export const PRESETS: PresetItem[] = [];
 
 interface PlaygroundSidebarProps {
   systemInstruction: string;
@@ -115,6 +43,8 @@ interface PlaygroundSidebarProps {
   enabledAgents: string[];
   onToggleAgent: (agentId: string) => void;
   onSelectPreset: (preset: PresetItem) => void;
+  onLoadRun?: (runData: any) => void;
+  onNewConversation?: () => void;
 }
 
 export default function PlaygroundSidebar({
@@ -124,253 +54,392 @@ export default function PlaygroundSidebar({
   onTemperatureChange,
   topP,
   onTopPChange,
-  enabledAgents,
-  onToggleAgent,
   onSelectPreset,
+  onLoadRun,
+  onNewConversation,
 }: PlaygroundSidebarProps) {
-  const [systemOpen, setSystemOpen] = useState(true);
-  const [paramsOpen, setParamsOpen] = useState(true);
-  const [agentsOpen, setAgentsOpen] = useState(true);
-  const [presetsOpen, setPresetsOpen] = useState(true);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [projects, setProjects] = useState<PresetItem[]>(PRESETS);
+  const [runs, setRuns] = useState<any[]>([]);
+  const [historySearch, setHistorySearch] = useState("");
+  const [loadingRunId, setLoadingRunId] = useState<string | null>(null);
+  const { toast } = useToast();
+  const router = useRouter();
 
-  const agentsList = [
-    {
-      id: "scraper",
-      name: "1. Precedent & Web Miner",
-      desc: "Mines past editions (1.0, 2.0, winning PPTs) & live web citations.",
-      icon: "🌐",
-    },
-    {
-      id: "profiler",
-      name: "2. Jury Profiler & Rubrics",
-      desc: "Synthesizes judging archetypes, criteria weights, and win factors.",
-      icon: "🧠",
-    },
-    {
-      id: "feasibility",
-      name: "3. Trade-off & Feasibility Engine",
-      desc: "Constructs 'Why THIS vs Why NOT THAT' matrix & MVP scope.",
-      icon: "⚖️",
-    },
-    {
-      id: "blueprint",
-      name: "4. Enterprise Blueprint Architect",
-      desc: "Draws Mermaid flowcharts, subgraphs, and component topologies.",
-      icon: "🏛️",
-    },
-    {
-      id: "pitch",
-      name: "5. Pitch Deck & Jury Defense",
-      desc: "Builds 5-slide deck, speaker notes, and anticipated jury Q&A.",
-      icon: "🚀",
-    },
-  ];
+  // Settings State
+  const [defaultModel, setDefaultModel] = useState("gemini-3.5-flash-lite");
+  const [savingSettings, setSavingSettings] = useState(false);
+
+  const fetchRuns = () => {
+    apiFetch("/api/me/runs")
+      .then((res) => {
+        if (!res.ok) return { runs: [] };
+        return res.json();
+      })
+      .then((data) => {
+        if (data.runs) setRuns(data.runs);
+      })
+      .catch(console.error);
+  };
+
+  useEffect(() => {
+    fetchRuns();
+  }, []);
+
+  const handleSelectRun = async (runId: string) => {
+    setLoadingRunId(runId);
+    try {
+      const res = await apiFetch(`/api/me/runs/${runId}`);
+      if (!res.ok) throw new Error("Could not load run");
+      const fullRun = await res.json();
+      if (onLoadRun) {
+        onLoadRun(fullRun);
+        toast(`Loaded: ${fullRun.title || "Strategy Run"}`, "success");
+      }
+      setHistoryOpen(false);
+    } catch (err) {
+      console.error(err);
+      toast("Failed to load run data", "error");
+    } finally {
+      setLoadingRunId(null);
+    }
+  };
+
+  const handleDeleteRun = async (e: React.MouseEvent, runId: string) => {
+    e.stopPropagation();
+    try {
+      const res = await apiFetch(`/api/me/runs/${runId}`, { method: "DELETE" });
+      if (res.ok) {
+        setRuns((prev) => prev.filter((r) => r.id !== runId));
+        toast("Conversation deleted", "info");
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleCreateProject = () => {
+    const name = prompt("Enter new project preset name:");
+    if (name?.trim()) {
+      const newProj: PresetItem = {
+        id: Date.now().toString(),
+        name: name.trim(),
+        organizer: "",
+        problem: "",
+        constraints: "",
+        persona: systemInstruction,
+        tag: "Custom",
+      };
+      setProjects([...projects, newProj]);
+      toast(`Created project preset: ${name}`, "success");
+    }
+  };
+
+  const handleSaveSettings = async () => {
+    setSavingSettings(true);
+    try {
+      await apiFetch("/api/me/settings", {
+        method: "PUT",
+        body: JSON.stringify({
+          default_model: defaultModel,
+          temperature,
+          system_instruction: systemInstruction,
+        }),
+      });
+      toast("Settings saved successfully", "success");
+      setSettingsOpen(false);
+    } catch (err) {
+      console.error(err);
+      toast("Failed to save settings", "error");
+    } finally {
+      setSavingSettings(false);
+    }
+  };
+
+  const handleLogout = () => {
+    setToken(null);
+    toast("Logged out", "info");
+    router.push("/login");
+  };
+
+  const filteredRuns = runs.filter((r) => {
+    if (!historySearch.trim()) return true;
+    const term = historySearch.toLowerCase();
+    return (
+      (r.title && r.title.toLowerCase().includes(term)) ||
+      (r.organizer_name && r.organizer_name.toLowerCase().includes(term))
+    );
+  });
 
   return (
-    <aside className="w-full lg:w-80 xl:w-96 shrink-0 border-r border-white/10 bg-[#0B0B10]/60 backdrop-blur-md flex flex-col h-full overflow-y-auto font-sans p-4 gap-4 text-white">
-      {/* SECTION 1: System Instructions / Agent Persona */}
-      <div className="bg-[#12121A]/80 border border-white/10 rounded-xl overflow-hidden shadow-sm">
+    <aside className="w-full lg:w-[270px] shrink-0 bg-[#0A0A10] flex flex-col h-full font-sans text-white/80 border-r border-white/10 relative transition-all">
+      {/* New Conversation Button */}
+      <div className="px-3 pt-4 pb-3">
         <button
-          onClick={() => setSystemOpen(!systemOpen)}
-          className="w-full flex items-center justify-between p-3.5 text-xs font-mono font-bold tracking-wider uppercase text-white/90 hover:bg-white/5 transition-colors border-b border-white/5"
+          onClick={() => {
+            if (onNewConversation) onNewConversation();
+            toast("New conversation initiated", "info");
+          }}
+          className="w-full flex items-center justify-center gap-2 bg-white/5 hover:bg-white/10 text-white text-xs font-mono font-medium py-2 px-3 rounded-xl transition-all border border-white/10 hover:border-white/20 shadow-sm"
         >
-          <div className="flex items-center gap-2">
-            <Bot className="w-4 h-4 text-accent-magenta" />
-            <span>System Instructions</span>
-          </div>
-          {systemOpen ? <ChevronDown className="w-3.5 h-3.5 text-white/50" /> : <ChevronRight className="w-3.5 h-3.5 text-white/50" />}
+          <Plus className="w-3.5 h-3.5 text-accent-pink" />
+          <span>New Conversation</span>
         </button>
+      </div>
 
-        {systemOpen && (
-          <div className="p-3.5 flex flex-col gap-3">
-            <textarea
-              value={systemInstruction}
-              onChange={(e) => onSystemInstructionChange(e.target.value)}
-              placeholder="Define agent behavior, architectural constraints, and persona..."
-              className="w-full h-28 bg-[#07070B] border border-white/10 rounded-lg p-2.5 text-xs font-mono text-white/90 placeholder-white/30 focus:outline-none focus:border-accent-magenta resize-none transition-colors"
-            />
-
-            {/* Quick Persona Pills */}
-            <div className="flex flex-col gap-1.5">
-              <span className="text-[10px] font-mono text-white/40 uppercase">
-                Persona Presets
+      {/* Navigation List */}
+      <div className="flex-1 overflow-y-auto px-3 pb-6 scrollbar-none text-xs flex flex-col gap-5">
+        {/* Quick Tools */}
+        <div className="flex flex-col gap-1">
+          <button
+            onClick={() => setHistoryOpen(true)}
+            className="flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-white/5 text-white/70 hover:text-white transition-colors w-full text-left font-mono"
+          >
+            <div className="flex items-center gap-2">
+              <History className="w-3.5 h-3.5 text-accent-pink" />
+              <span>History Archive</span>
+            </div>
+            {runs.length > 0 && (
+              <span className="text-[10px] px-1.5 py-0.2 bg-white/10 rounded-full text-white/60">
+                {runs.length}
               </span>
-              <div className="grid grid-cols-2 gap-1.5">
-                {PERSONA_TEMPLATES.map((tmpl) => (
-                  <button
-                    key={tmpl.label}
-                    onClick={() => onSystemInstructionChange(tmpl.text)}
-                    className="text-left px-2 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded text-[11px] font-mono text-white/80 hover:text-white transition-colors truncate"
-                    title={tmpl.text}
-                  >
-                    + {tmpl.label}
-                  </button>
-                ))}
+            )}
+          </button>
+        </div>
+
+        {/* Project Presets (Only shown if custom created by user) */}
+        {projects.length > 0 && (
+          <div>
+            <div className="px-2 flex items-center justify-between text-[11px] font-mono text-white/40 mb-1.5 uppercase tracking-wider">
+              <span>Saved Presets</span>
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={handleCreateProject}
+                  title="Create Preset"
+                  className="text-white/40 hover:text-white transition-colors p-0.5"
+                >
+                  <FolderPlus className="w-3.5 h-3.5" />
+                </button>
               </div>
+            </div>
+            <div className="flex flex-col gap-1">
+              {projects.map((p) => (
+                <button
+                  key={p.id}
+                  onClick={() => {
+                    onSelectPreset(p);
+                    toast(`Loaded preset: ${p.name}`, "info");
+                  }}
+                  className="flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-white/5 text-white/70 hover:text-white transition-colors w-full text-left truncate group border border-transparent hover:border-white/5"
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Folder className="w-3.5 h-3.5 text-accent-magenta/70 shrink-0" />
+                    <span className="truncate">{p.name}</span>
+                  </div>
+                  {p.tag && (
+                    <span className="text-[9px] font-mono px-1.5 py-0.2 bg-white/5 rounded text-white/40 group-hover:text-accent-pink shrink-0">
+                      {p.tag}
+                    </span>
+                  )}
+                </button>
+              ))}
             </div>
           </div>
         )}
-      </div>
 
-      {/* SECTION 2: Model Generation Parameters */}
-      <div className="bg-[#12121A]/80 border border-white/10 rounded-xl overflow-hidden shadow-sm">
-        <button
-          onClick={() => setParamsOpen(!paramsOpen)}
-          className="w-full flex items-center justify-between p-3.5 text-xs font-mono font-bold tracking-wider uppercase text-white/90 hover:bg-white/5 transition-colors border-b border-white/5"
-        >
-          <div className="flex items-center gap-2">
-            <Sliders className="w-4 h-4 text-accent-pink" />
-            <span>Model Parameters</span>
+        {/* Recent Runs */}
+        <div>
+          <div className="px-2 flex items-center justify-between text-[11px] font-mono text-white/40 mb-1.5 uppercase tracking-wider">
+            <span>Recent Blueprints</span>
+            <button
+              onClick={fetchRuns}
+              className="hover:text-white transition-colors text-[10px]"
+              title="Refresh runs"
+            >
+              refresh
+            </button>
           </div>
-          {paramsOpen ? <ChevronDown className="w-3.5 h-3.5 text-white/50" /> : <ChevronRight className="w-3.5 h-3.5 text-white/50" />}
-        </button>
-
-        {paramsOpen && (
-          <div className="p-3.5 flex flex-col gap-4">
-            {/* Temperature Slider */}
-            <div className="flex flex-col gap-1.5">
-              <div className="flex items-center justify-between text-xs font-mono">
-                <span className="text-white/80 flex items-center gap-1">
-                  Temperature
-                  <Flame className="w-3 h-3 text-accent-pink" />
-                </span>
-                <span className="text-accent-pink font-bold">{temperature.toFixed(2)}</span>
-              </div>
-              <input
-                type="range"
-                min="0"
-                max="1"
-                step="0.05"
-                value={temperature}
-                onChange={(e) => onTemperatureChange(parseFloat(e.target.value))}
-                className="w-full accent-accent-pink bg-white/10 h-1.5 rounded-lg cursor-pointer"
-              />
-              <div className="flex justify-between text-[10px] font-mono text-white/40">
-                <span>Deterministic (0.0)</span>
-                <span>Creative (1.0)</span>
-              </div>
-            </div>
-
-            {/* Top-P Slider */}
-            <div className="flex flex-col gap-1.5">
-              <div className="flex items-center justify-between text-xs font-mono">
-                <span className="text-white/80">Top P</span>
-                <span className="text-accent-magenta font-bold">{topP.toFixed(2)}</span>
-              </div>
-              <input
-                type="range"
-                min="0.1"
-                max="1"
-                step="0.05"
-                value={topP}
-                onChange={(e) => onTopPChange(parseFloat(e.target.value))}
-                className="w-full accent-accent-magenta bg-white/10 h-1.5 rounded-lg cursor-pointer"
-              />
-            </div>
-
-            {/* Grounding Toggle */}
-            <div className="flex items-center justify-between pt-2 border-t border-white/10 text-xs">
-              <div className="flex items-center gap-2">
-                <Database className="w-3.5 h-3.5 text-accent-pink" />
-                <span className="font-mono text-white/90">PGVector Knowledge</span>
-              </div>
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                Active
+          <div className="flex flex-col gap-1">
+            {runs.length === 0 ? (
+              <span className="text-[11px] text-white/30 px-2 py-1 font-mono italic">
+                No runs recorded yet
               </span>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* SECTION 3: Multi-Agent Swarm Toggles */}
-      <div className="bg-[#12121A]/80 border border-white/10 rounded-xl overflow-hidden shadow-sm">
-        <button
-          onClick={() => setAgentsOpen(!agentsOpen)}
-          className="w-full flex items-center justify-between p-3.5 text-xs font-mono font-bold tracking-wider uppercase text-white/90 hover:bg-white/5 transition-colors border-b border-white/5"
-        >
-          <div className="flex items-center gap-2">
-            <Layers className="w-4 h-4 text-emerald-400" />
-            <span>Agent Swarm Nodes</span>
-          </div>
-          {agentsOpen ? <ChevronDown className="w-3.5 h-3.5 text-white/50" /> : <ChevronRight className="w-3.5 h-3.5 text-white/50" />}
-        </button>
-
-        {agentsOpen && (
-          <div className="p-3.5 flex flex-col gap-2.5">
-            {agentsList.map((agent) => {
-              const isEnabled = enabledAgents.includes(agent.id);
-              return (
+            ) : (
+              runs.slice(0, 8).map((r) => (
                 <div
-                  key={agent.id}
-                  onClick={() => onToggleAgent(agent.id)}
-                  className={`flex items-start gap-2.5 p-2 rounded-lg cursor-pointer transition-colors border ${
-                    isEnabled
-                      ? "bg-white/5 border-white/15"
-                      : "bg-transparent border-transparent opacity-50"
+                  key={r.id}
+                  onClick={() => handleSelectRun(r.id)}
+                  className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-white/5 text-white/70 hover:text-white transition-colors w-full text-left cursor-pointer group border border-transparent hover:border-white/5 ${
+                    loadingRunId === r.id ? "opacity-50 pointer-events-none" : ""
                   }`}
                 >
-                  <div className="mt-0.5 text-accent-pink">
-                    {isEnabled ? (
-                      <CheckSquare className="w-4 h-4" />
-                    ) : (
-                      <Square className="w-4 h-4" />
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-sm">{agent.icon}</span>
-                      <span className="text-xs font-semibold text-white truncate">
-                        {agent.name}
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-muted-on-dark leading-tight mt-0.5">
-                      {agent.desc}
-                    </p>
+                  <span className="truncate flex-1 font-sans text-xs">
+                    {r.title || r.organizer_name || "Untitled Strategy"}
+                  </span>
+                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button
+                      onClick={(e) => handleDeleteRun(e, r.id)}
+                      className="p-1 hover:text-red-400 text-white/40 transition-colors"
+                      title="Delete run"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </button>
                   </div>
                 </div>
-              );
-            })}
+              ))
+            )}
           </div>
-        )}
+        </div>
       </div>
 
-      {/* SECTION 4: Preset Hackathons (Click-To-Load) */}
-      <div className="bg-[#12121A]/80 border border-white/10 rounded-xl overflow-hidden shadow-sm">
+      {/* Bottom Settings Bar with extra clearance */}
+      <div className="p-3 pb-8 mt-auto border-t border-white/5 bg-[#09090F]">
         <button
-          onClick={() => setPresetsOpen(!presetsOpen)}
-          className="w-full flex items-center justify-between p-3.5 text-xs font-mono font-bold tracking-wider uppercase text-white/90 hover:bg-white/5 transition-colors border-b border-white/5"
+          onClick={() => setSettingsOpen(true)}
+          className="flex items-center gap-2.5 px-2.5 py-2 text-xs font-mono text-white/60 hover:text-white rounded-lg hover:bg-white/5 transition-colors w-full text-left"
         >
-          <div className="flex items-center gap-2">
-            <Bookmark className="w-4 h-4 text-amber-400" />
-            <span>Preset Hackathons</span>
-          </div>
-          {presetsOpen ? <ChevronDown className="w-3.5 h-3.5 text-white/50" /> : <ChevronRight className="w-3.5 h-3.5 text-white/50" />}
+          <Settings className="w-3.5 h-3.5 text-accent-pink" />
+          <span>Settings</span>
         </button>
-
-        {presetsOpen && (
-          <div className="p-3 flex flex-col gap-2">
-            {PRESETS.map((preset) => (
-              <button
-                key={preset.id}
-                onClick={() => onSelectPreset(preset)}
-                className="w-full text-left p-2.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 hover:border-accent-pink/40 transition-all flex flex-col gap-1 group"
-              >
-                <div className="flex items-center justify-between gap-1">
-                  <span className="text-xs font-bold text-white group-hover:text-accent-pink transition-colors truncate">
-                    {preset.name}
-                  </span>
-                  <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-white/10 text-white/70 shrink-0">
-                    {preset.tag}
-                  </span>
-                </div>
-                <p className="text-[11px] text-muted-on-dark line-clamp-2 leading-tight">
-                  {preset.problem}
-                </p>
-              </button>
-            ))}
-          </div>
-        )}
       </div>
+
+      {/* History Archive Modal */}
+      {historyOpen && (
+        <div className="fixed inset-0 bg-black/75 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <div className="bg-[#12121A] border border-white/10 rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden flex flex-col max-h-[80vh]">
+            <div className="px-5 py-4 border-b border-white/10 flex items-center justify-between bg-[#151522]">
+              <div className="flex items-center gap-2">
+                <History className="w-4 h-4 text-accent-pink" />
+                <h3 className="font-mono text-sm font-semibold text-white">History Archive</h3>
+              </div>
+              <button
+                onClick={() => setHistoryOpen(false)}
+                className="text-white/40 hover:text-white p-1"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-4 border-b border-white/5 bg-[#0D0D14]">
+              <div className="relative">
+                <Search className="w-3.5 h-3.5 text-white/40 absolute left-3 top-2.5" />
+                <input
+                  type="text"
+                  value={historySearch}
+                  onChange={(e) => setHistorySearch(e.target.value)}
+                  placeholder="Search previous hackathon runs..."
+                  className="w-full bg-[#14141E] border border-white/10 rounded-xl pl-8 pr-3 py-1.5 text-xs text-white placeholder-white/30 focus:outline-none focus:border-accent-pink"
+                />
+              </div>
+            </div>
+
+            <div className="p-4 overflow-y-auto flex-1 flex flex-col gap-2">
+              {filteredRuns.length === 0 ? (
+                <div className="text-center py-8 text-white/40 text-xs font-mono">
+                  No matching strategies found.
+                </div>
+              ) : (
+                filteredRuns.map((r) => (
+                  <div
+                    key={r.id}
+                    onClick={() => handleSelectRun(r.id)}
+                    className="p-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 hover:border-accent-pink/30 cursor-pointer transition-all flex items-center justify-between group"
+                  >
+                    <div>
+                      <h4 className="text-xs font-semibold text-white group-hover:text-accent-pink transition-colors">
+                        {r.title || r.organizer_name || "Untitled Strategy"}
+                      </h4>
+                      <p className="text-[11px] text-white/40 font-mono mt-0.5">
+                        {r.organizer_name ? `Organizer: ${r.organizer_name}` : "Custom Run"}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-mono text-white/30">
+                        {r.created_at ? new Date(r.created_at).toLocaleDateString() : ""}
+                      </span>
+                      <ExternalLink className="w-3.5 h-3.5 text-white/40 group-hover:text-white" />
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Settings Modal */}
+      {settingsOpen && (
+        <div className="fixed inset-0 bg-black/75 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <div className="bg-[#12121A] border border-white/10 rounded-2xl shadow-2xl max-w-md w-full overflow-hidden flex flex-col">
+            <div className="px-5 py-4 border-b border-white/10 flex items-center justify-between bg-[#151522]">
+              <div className="flex items-center gap-2">
+                <Settings className="w-4 h-4 text-accent-pink" />
+                <h3 className="font-mono text-sm font-semibold text-white">Preferences</h3>
+              </div>
+              <button
+                onClick={() => setSettingsOpen(false)}
+                className="text-white/40 hover:text-white p-1"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-5 flex flex-col gap-4 text-xs font-mono">
+              <div>
+                <div className="flex justify-between text-white/70 mb-1.5">
+                  <span>Temperature (Creativity)</span>
+                  <span className="text-accent-pink">{temperature}</span>
+                </div>
+                <input
+                  type="range"
+                  min="0.1"
+                  max="1.5"
+                  step="0.05"
+                  value={temperature}
+                  onChange={(e) => onTemperatureChange(parseFloat(e.target.value))}
+                  className="w-full accent-accent-pink"
+                />
+              </div>
+
+              <div>
+                <label className="block text-white/70 mb-1.5">System Instruction Persona</label>
+                <textarea
+                  value={systemInstruction}
+                  onChange={(e) => onSystemInstructionChange(e.target.value)}
+                  rows={3}
+                  className="w-full bg-[#0E0E16] border border-white/10 rounded-xl p-2.5 text-white placeholder-white/30 focus:outline-none focus:border-accent-pink font-sans text-xs"
+                />
+              </div>
+            </div>
+
+            <div className="px-5 py-3 border-t border-white/10 bg-[#0E0E16] flex justify-between items-center">
+              <button
+                onClick={handleLogout}
+                className="text-red-400 hover:text-red-300 font-mono text-xs px-2 py-1 rounded transition-colors"
+              >
+                Sign Out
+              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setSettingsOpen(false)}
+                  className="px-3 py-1.5 bg-white/5 hover:bg-white/10 text-white font-mono text-xs rounded-lg transition-colors border border-white/10"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveSettings}
+                  disabled={savingSettings}
+                  className="px-4 py-1.5 bg-accent-pink hover:bg-white text-black font-mono font-bold text-xs rounded-lg transition-colors shadow-sm disabled:opacity-50"
+                >
+                  {savingSettings ? "Saving..." : "Save Preferences"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </aside>
   );
 }

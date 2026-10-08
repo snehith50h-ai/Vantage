@@ -7,6 +7,7 @@ import remarkGfm from "remark-gfm";
 import Mermaid from "@/components/Mermaid";
 import { extractMermaidCode } from "@/utils/mermaidToXml";
 import DrawioEditor from "@/components/DrawioEditor";
+import { apiFetch } from "@/lib/api";
 
 interface ArchitectureSectionProps {
   architecture: string;
@@ -52,9 +53,8 @@ export default function ArchitectureSection({
     setError("");
 
     try {
-      const response = await fetch("http://localhost:8000/api/edit-architecture", {
+      const response = await apiFetch("/api/edit-architecture", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           current_architecture: architecture,
           edit_instructions: editPrompt,

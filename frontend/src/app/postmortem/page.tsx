@@ -5,6 +5,7 @@ import LenisProvider from "@/components/LenisProvider";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { BookOpen, Zap, Target, History, Trophy, BrainCircuit, AlertCircle } from "lucide-react";
+import { apiFetch } from "@/lib/api";
 
 interface CapabilityUpdate {
   skill: string;
@@ -39,9 +40,8 @@ export default function PostmortemPage() {
     setResult(null);
 
     try {
-      const response = await fetch("http://localhost:8000/api/project/postmortem", {
+      const response = await apiFetch("/api/project/postmortem", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           project_name: projectName,
           reflections: reflections

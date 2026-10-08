@@ -35,9 +35,13 @@ def github_scraper_node(state: HackathonState) -> dict:
     
     # We will search the 'description' or 'url' fields of scraped_history for github.com
     for item in scraped_history:
+        url = item.get("url", "")
         desc = item.get("description", "")
-        # Very simple extraction for demonstration
-        if "github.com/" in desc:
+        
+        if "github.com/" in url:
+            if url not in found_repos:
+                found_repos.append(url)
+        elif "github.com/" in desc:
             start_idx = desc.find("github.com/")
             end_idx = desc.find(" ", start_idx)
             if end_idx == -1: end_idx = len(desc)

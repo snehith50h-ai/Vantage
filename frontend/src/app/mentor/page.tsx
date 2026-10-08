@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { Bot, AlertTriangle, ShieldCheck, Zap } from "lucide-react";
+import { apiFetch } from "@/lib/api";
 
 export default function MentorPage() {
   const [projectState, setProjectState] = useState(
@@ -21,9 +22,8 @@ export default function MentorPage() {
     setError("");
     setResult(null);
     try {
-      const response = await fetch("http://localhost:8000/api/mentor", {
+      const response = await apiFetch("/api/mentor", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           project_state: projectState,
           current_code: currentCode,

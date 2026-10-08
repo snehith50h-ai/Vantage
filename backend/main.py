@@ -7,14 +7,18 @@ from fastapi.middleware.cors import CORSMiddleware
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.prompts import PromptTemplate
 from agents.scraper import search_duckduckgo
+from agents.principal_architect import generate_senior_engineer_blueprint, generate_fallback_blueprint
+from utils import parse_json_robustly, generate_dynamic_feasibility_fallback, generate_dynamic_pitch_fallback, extract_problem_keywords
+import re
 import os
 import time
 import json
+import asyncio
 from dotenv import load_dotenv
 
 load_dotenv()
 
-app = FastAPI(title="Vantage AI Studio API", version="2.1.0")
+app = FastAPI(title="Vantage API", version="2.1.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -22,7 +26,17 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["X-Run-Id", "X-Item-Id"],
 )
+
+# Auth + per-user data (history, saved items, settings, usage)
+from auth import router as auth_router
+from user_data import router as user_data_router
+from persistence import PersistenceMiddleware
+
+app.add_middleware(PersistenceMiddleware)
+app.include_router(auth_router)
+app.include_router(user_data_router)
 
 class HackathonRequest(BaseModel):
     organizer_name: str
@@ -156,7 +170,7 @@ def get_llm(model_name: str = "gemini-3.5-flash-lite", temperature: float = 0.7)
     )
 
 @app.post("/api/strategize")
-async def strategize(req: HackathonRequest):
+async def strategize(req: PlaygroundRequest):
     initial_state = {
         "organizer_name": req.organizer_name,
         "problem_statement": req.problem_statement,
@@ -168,12 +182,13 @@ async def strategize(req: HackathonRequest):
     }
     
     try:
-        final_state = hackathon_graph.invoke(initial_state)
+        final_state = await asyncio.to_thread(hackathon_graph.invoke, initial_state)
         return {
             "precedent_intelligence": final_state.get("precedent_intelligence"),
             "jury_profile": final_state.get("jury_profile"),
             "feasibility_analysis": final_state.get("feasibility_analysis"),
             "final_blueprint": final_state.get("final_blueprint"),
+            "scraped_history": final_state.get("scraped_history", []),
             "github_intel": final_state.get("github_intel"),
             "risk_assessment": final_state.get("risk_assessment"),
             "execution_timeline": final_state.get("execution_timeline"),
@@ -182,48 +197,20 @@ async def strategize(req: HackathonRequest):
         }
     except Exception as e:
         print(f"Error during graph execution: {e}")
-        org = req.organizer_name or "Hackathon"
-        prob = req.problem_statement or "Project"
-        fallback_mermaid = f"""graph TD
-  subgraph Edge ["1. Edge & Telemetry Ingestion"]
-    A[IoT Telemetry / Field Sensors] -->|gRPC / MQTT| B[Ingress API Gateway]
-    U[Mobile & Web Client] -->|HTTPS / WSS| B
-  end
-
-  subgraph Gateway ["2. API & Security Gateway"]
-    B -->|JWT Validation| C[Auth & Rate Limiter Service]
-    B -->|Reverse Proxy| D[Service Mesh Routing]
-  end
-
-  subgraph Core ["3. Core Microservices"]
-    D -->|Internal RPC| E[Subsidence Prediction Service]
-    D -->|Real-time Socket| F[Alert Notification Engine]
-    D -->|Analytics API| G[Spatial Geospatial Analytics]
-  end
-
-  subgraph AsyncQueue ["4. Event Streaming & Queue"]
-    E -->|Publish Event| H[Apache Kafka / Redis Stream]
-    H -->|Consume Task| I[Worker Nodes / ML Inference]
-  end
-
-  subgraph Persistence ["5. Persistence & Storage Layer"]
-    E -->|Read/Write| J[(PostgreSQL with TimescaleDB)]
-    I -->|Cache Hot Data| K[(Redis Distributed Cache)]
-    G -->|Object Storage| L[(MinIO / S3 Geospatial Tensors)]
-  end"""
+        org = req.organizer_name or "Premier Hackathon"
+        prob = req.problem_statement or "Real-World Challenge"
+        blueprint_fb = generate_fallback_blueprint(prob, org, f"Jury Profile for {org}", "")
+        pitch_fb = generate_dynamic_pitch_fallback(prob, org)
+        feasibility_fb = generate_dynamic_feasibility_fallback(prob, org)
         return {
-            "jury_profile": f"**Jury Profile Analysis for {org}**\n\n* **Evaluation Priorities**: Deep technical feasibility, verifiable real-time sensor processing, cost-effective deployments, and rock-solid fail-safes.\n* **Key Scoring Criteria**: Working prototypes, clear architecture boundaries, low latency under constrained network environments, and quantifiable ROI.",
+            "jury_profile": f"**Jury Profile Analysis for {org}**\n\n* **Evaluation Priorities**: Real-world feasibility for {prob[:120]}, clean architectural boundaries, zero vanity bloat, and verified working code.\n* **Key Scoring Criteria**: Working Prototype (30%), Technical Architecture (30%), Practical Viability (20%), Live Demo (20%).",
+            "feasibility_analysis": feasibility_fb,
             "final_blueprint": {
-                "architecture": f"## Enterprise System Architecture Blueprint\n\n```mermaid\n{fallback_mermaid}\n```\n\n### Technology Stack & Comparative Analysis\n\n* **Frontend & Dashboard**: Next.js 15, Tailwind CSS, WebGL canvas. *Chosen over plain React for edge SSR and high-performance real-time telemetry rendering.*\n* **Backend API & Processing**: FastAPI & Python 3.12 with async workers. *Chosen over Node.js for native C-extension scientific computing and geospatial libraries.*\n* **Event Streaming**: Apache Kafka / Redis Streams. *Chosen over direct HTTP coupling to guarantee zero message loss during underground network drops.*\n* **Storage**: PostgreSQL with TimescaleDB & pgvector. *Provides time-series telemetry compression combined with spatial vector search in a unified transactional engine.*",
-                "pitch_outline": {
-                    "slides": [
-                        {"title": "1. The High-Stakes Problem", "content": f"Underground mining hazards demand instant, low-cost sensor intelligence: {prob[:120]}..."},
-                        {"title": "2. Our Solution & Secret Sauce", "content": "An edge-to-cloud AI early warning mesh with sub-second subsidence prediction and zero-latency audible alarms."},
-                        {"title": "3. Enterprise Architecture", "content": "Decoupled microservices architecture utilizing Kafka event streaming, TimescaleDB time-series storage, and high-frequency edge inferencing."},
-                        {"title": "4. Field Validation & Cost Impact", "content": "Deployment cost under 10% of traditional laser radar systems with 99.4% prediction accuracy 45 minutes prior to structural shifts."},
-                        {"title": "5. Why We Win The Jury", "content": f"Specifically engineered to meet {org}'s strict rubrics for life safety, low hardware cost, and production scalability."}
-                    ]
-                }
+                "architecture": blueprint_fb["architecture"],
+                "pitch_outline": pitch_fb,
+                "feasibility": feasibility_fb,
+                "tradeoff_matrix": feasibility_fb.get("tech_tradeoffs", []),
+                "jury_defense_qa": pitch_fb.get("jury_defense_qa", [])
             }
         }
 
@@ -576,26 +563,23 @@ async def playground_generate(req: PlaygroundRequest):
             f"}}"
         )
         res_intel = llm.invoke(synth_prompt).content
-        clean_json = extract_text_content(res_intel).strip()
-        if clean_json.startswith("```json"):
-            clean_json = clean_json[7:-3].strip()
-        elif clean_json.startswith("```"):
-            clean_json = clean_json[3:-3].strip()
-        precedent_intel = json.loads(clean_json)
+        precedent_intel = parse_json_robustly(res_intel)
+        if not precedent_intel or not isinstance(precedent_intel, dict):
+            raise ValueError("Parsed precedent intel is not a valid dictionary")
     except Exception as e:
         print(f"Precedent agent fallback: {e}")
         precedent_intel = {
-            "past_editions_analyzed": f"Analysis of past editions for {org} demonstrates that winning teams paired deep edge fault-tolerance with concrete live simulations and quantitative cost benchmarks.",
+            "past_editions_analyzed": f"Analysis of past editions for {org} demonstrates that winning teams paired demonstrable technical feasibility for '{prob[:80]}' with interactive live simulations and clean, disciplined scope boundaries.",
             "winning_patterns": [
-                "Full Stack Working Prototype: Demonstrating live ingestion to alert trigger beats mock-heavy slides every time.",
-                "Offline-First Resiliency: Field judges prioritize architectures that survive network disconnects.",
-                "Zero Vanity Bloat: Winning teams ruthlessly cut non-essential features (e.g. blockchain, metaverses) in favor of core reliability."
+                "Full Stack Working Prototype: Demonstrating live end-to-end data processing beats mock-heavy slides every time.",
+                "Offline-First Resiliency: Field judges prioritize architectures that survive network disconnects during the presentation.",
+                "Zero Vanity Bloat: Winning teams ruthlessly cut non-essential features (e.g. metaverses, complex microservices sprawl) in favor of core reliability."
             ],
             "winning_ppt_strategy": "Lead with Problem Reality (Slide 1), Solution & Secret Sauce (Slide 2), System Flowchart (Slide 3), Field Validation Metrics (Slide 4), and Clear ROI (Slide 5).",
             "benchmarks": [
-                "End-to-End Latency < 1.2 seconds",
-                "Deployment Cost Under ₹15,000 per autonomous unit",
-                "99.4% Anomaly Precision under noisy field telemetry"
+                "End-to-End Latency < 250ms on primary user flow",
+                "100% Free-Tier / Open-Source Infrastructure cost during sprint",
+                "Zero broken endpoints during live 3-minute jury cross-examination"
             ]
         }
     
@@ -713,100 +697,12 @@ async def playground_generate(req: PlaygroundRequest):
             f"}}"
         )
         feas_res = llm.invoke(feas_prompt).content
-        clean_fjson = extract_text_content(feas_res).strip()
-        if clean_fjson.startswith("```json"):
-            clean_fjson = clean_fjson[7:-3].strip()
-        elif clean_fjson.startswith("```"):
-            clean_fjson = clean_fjson[3:-3].strip()
-        feasibility_data = json.loads(clean_fjson)
+        feasibility_data = parse_json_robustly(feas_res)
+        if not feasibility_data or not isinstance(feasibility_data, dict):
+            raise ValueError("Parsed feasibility JSON is not a valid dictionary")
     except Exception as e:
-        print(f"Feasibility engine fallback: {e}")
-        feasibility_data = {
-            "technical_feasibility": {
-                "score": 93,
-                "summary": "Highly feasible using modular microservices, pre-trained edge inferencing, and time-series telemetry pipelines.",
-                "key_enablers": [
-                    "Decoupled edge-to-cloud architecture allows offline operation during underground network drops.",
-                    "Lightweight tensor inference models run directly on constrained edge gateways."
-                ]
-            },
-            "economic_viability": {
-                "score": 91,
-                "summary": "Achieves >85% cost reduction compared to legacy industrial radar monitoring systems.",
-                "unit_cost_estimate": "Estimated under ₹14,500 per autonomous sensor node"
-            },
-            "sprint_mvp_fit": {
-                "score": 95,
-                "mvp_focus": "Live simulated sensor telemetry streaming into a real-time subsidence heatmap with sub-second threshold alerts.",
-                "simulated_elements": "Hardware sensor mesh simulated via synthetic IoT telemetry script generator for zero-hardware demo risk."
-            },
-            "why_this_feature": [
-                {
-                    "feature": "Sub-Second Early Warning Alert Engine",
-                    "why_chosen": "Judges reward immediate, verifiable alarms that prove lives and equipment are protected.",
-                    "rubric_alignment": "Directly scores 30% weighting on 'Real-World Impact' & 'Technical Reliability'."
-                },
-                {
-                    "feature": "Offline-First Edge Mesh Sync",
-                    "why_chosen": "Guarantees system operates seamlessly even when WiFi or cellular drops, preventing demo crashes.",
-                    "rubric_alignment": "Fulfills 'Fault Tolerance & Field Feasibility' rubric criteria."
-                },
-                {
-                    "feature": "Geospatial Subsidence Heatmap",
-                    "why_chosen": "Creates an immediate high-impact visual within the first 15 seconds of the presentation.",
-                    "rubric_alignment": "Maximizes 'Innovation & Presentation Clarity' score."
-                }
-            ],
-            "why_not_that_feature": [
-                {
-                    "feature": "Full Proprietary Satellite Radar Ingestion",
-                    "why_rejected": "Proprietary satellite APIs require paid licenses and have 48-hour data lag, ruining real-time credibility.",
-                    "risk_avoided": "Third-party API latency and authentication failures during live jury demo."
-                },
-                {
-                    "feature": "Blockchain / Web3 Ledger for Telemetry",
-                    "why_rejected": "Adds unnecessary gas costs and write latency to high-frequency sensor readings without improving mine safety.",
-                    "risk_avoided": "Severe jury penalty for vanity technology bloat."
-                },
-                {
-                    "feature": "Native Mobile App from Scratch",
-                    "why_rejected": "Building and compiling separate iOS/Android builds in a 36-hour sprint divides team focus.",
-                    "risk_avoided": "Incomplete codebases and simulator crashes during presentation."
-                }
-            ],
-            "tech_tradeoffs": [
-                {
-                    "layer": "Frontend & Real-Time Dashboard",
-                    "chosen": "Next.js 15 + WebGL Canvas",
-                    "alternative": "Create React App / Plain React",
-                    "tradeoff_rationale": "Next.js provides instant server-rendered telemetry dashboards while WebGL renders 10,000+ data points smoothly without UI lag."
-                },
-                {
-                    "layer": "Backend API & Ingestion",
-                    "chosen": "FastAPI (Python 3.12)",
-                    "alternative": "Node.js / Express.js",
-                    "tradeoff_rationale": "FastAPI provides native asynchronous I/O and direct compatibility with NumPy/PyTorch models without multi-language IPC overhead."
-                },
-                {
-                    "layer": "Message Ingestion & Queue",
-                    "chosen": "Apache Kafka / Redis Streams",
-                    "alternative": "Direct REST HTTP Webhooks",
-                    "tradeoff_rationale": "Kafka guarantees zero message loss during intermittent network drops by spooling telemetry on edge brokers."
-                },
-                {
-                    "layer": "Telemetry & Anomaly Database",
-                    "chosen": "PostgreSQL with TimescaleDB",
-                    "alternative": "MongoDB / NoSQL",
-                    "tradeoff_rationale": "TimescaleDB delivers 90% time-series data compression with SQL spatial queries, outperforming document stores for temporal analysis."
-                },
-                {
-                    "layer": "Edge Protocol",
-                    "chosen": "MQTT / gRPC over TLS",
-                    "alternative": "JSON over HTTP/1.1",
-                    "tradeoff_rationale": "MQTT uses a 2-byte header compared to HTTP's 800-byte headers, saving 95% bandwidth in low-connectivity underground mines."
-                }
-            ]
-        }
+        print(f"Feasibility engine fallback (generating problem-specific dynamic feasibility): {e}")
+        feasibility_data = generate_dynamic_feasibility_fallback(prob, org, constraints)
         
     trace_steps.append({
         "agent": "feasibility",
@@ -817,78 +713,33 @@ async def playground_generate(req: PlaygroundRequest):
     })
 
     # -------------------------------------------------------------
-    # AGENT 4: Enterprise Blueprint Architect
+    # AGENT 4: Principal Architect (Senior Engineer Mode)
     # -------------------------------------------------------------
     t3 = time.time()
     architecture = ""
     try:
-        tradeoffs_summary = "\n".join([f"- {t['layer']}: Chose {t['chosen']} over {t['alternative']}. Rationale: {t['tradeoff_rationale']}" for t in feasibility_data.get("tech_tradeoffs", [])])
-        blueprint_prompt = (
-            f"{sys_instruction}\n\n" if sys_instruction else ""
-        ) + (
-            f"You are an Elite Enterprise Technical Architect.\n"
-            f"Problem Statement: {prob}\n"
-            f"Organizer: {org}\n"
-            f"Jury Profile Context: {jury_profile[:350]}\n"
-            f"Comparative Tech Stack Rationale:\n{tradeoffs_summary}\n"
-            f"{'Target Constraints: ' + constraints if constraints else ''}\n\n"
-            f"REQUIREMENTS:\n"
-            f"1. Design a comprehensive production-grade enterprise system architecture.\n"
-            f"2. Provide a valid Mermaid flowchart enclosed in ```mermaid ... ``` (use graph TD or flowchart TD) with distinct subgraphs (Client/Edge, Ingress/Gateway, Microservices, Event/Queue, Persistence/Cache).\n"
-            f"3. In the 'Technology Stack & Comparative Analysis' section, explain why each component was chosen over alternatives ('We chose X over Y because...').\n"
-            f"4. Provide bullet points on High Availability, Scalability, and Security."
+        blueprint_result = generate_senior_engineer_blueprint(
+            problem=prob,
+            organizer=org,
+            jury_profile=jury_profile,
+            constraints=constraints if constraints else "",
+            sources=precedent_intel.get("web_sources", []),
+            feasibility_data=feasibility_data,
+            model_name=model_name,
+            temperature=min(temperature, 0.3)
         )
-        bp_res = llm.invoke(blueprint_prompt).content
-        architecture = extract_text_content(bp_res)
+        architecture = blueprint_result["architecture"]
     except Exception as e:
         print(f"Blueprint error: {e}")
-        fallback_mermaid = f"""graph TD
-  subgraph EdgeLayer ["1. Edge & Telemetry Ingestion"]
-    SENSORS[IoT Sensor Array / Field Nodes] -->|LoRa / MQTT| GW[Field Edge Gateway]
-    CLIENT[Web Dashboard / Mobile App] -->|HTTPS / WSS| API_GW[Ingress API Gateway]
-    GW -->|gRPC TLS| API_GW
-  end
-
-  subgraph GatewayLayer ["2. API Gateway & Security"]
-    API_GW -->|OAuth2 / API Key| AUTH[Auth & Token Verifier]
-    API_GW -->|Token Bucket| RATELIMIT[Distributed Rate Limiter]
-    API_GW -->|Reverse Proxy| ROUTER[Dynamic Service Router]
-  end
-
-  subgraph CoreLayer ["3. Core Microservices Mesh"]
-    ROUTER -->|Internal gRPC| PREDICT[Prediction & AI Inference Engine]
-    ROUTER -->|Event Stream| ALERT[Emergency Early Warning Service]
-    ROUTER -->|REST / JSON| TELEMETRY[Telemetry Aggregation Service]
-  end
-
-  subgraph EventLayer ["4. Async Event Streaming & Queue"]
-    TELEMETRY -->|Produce Records| KAFKA[Apache Kafka / Event Bus]
-    KAFKA -->|Consume Batch| WORKERS[Background Anomaly Workers]
-    WORKERS -->|Push Trigger| ALERT
-  end
-
-  subgraph StorageLayer ["5. Persistence & Distributed Cache"]
-    PREDICT -->|Cache Hot Predictions| REDIS[(Redis Cache Cluster)]
-    TELEMETRY -->|Time-Series Ingestion| TIMESCALE[(PostgreSQL / TimescaleDB)]
-    WORKERS -->|Cold Storage Archive| S3[(Encrypted Object Store / S3)]
-  end"""
-        architecture = (
-            f"## Enterprise System Architecture Blueprint\n\n"
-            f"```mermaid\n{fallback_mermaid}\n```\n\n"
-            f"### Technology Stack & Comparative Analysis\n\n"
-            f"* **Edge Ingestion**: gRPC over TLS & MQTT. *Chosen over HTTP REST for 10x lower network overhead in bandwidth-constrained environments.*\n"
-            f"* **API Gateway & Routing**: Ingress Controller with Envoy / Traefik. *Provides dynamic circuit-breaking, distributed rate limiting, and zero-downtime routing.*\n"
-            f"* **Core Microservices**: FastAPI & Python 3.12. *Chosen over Express.js for native asynchronous support, type annotations, and direct compatibility with ML prediction pipelines.*\n"
-            f"* **Message Broker**: Apache Kafka. *Chosen over RabbitMQ for high-throughput replayable event streaming and partition-based horizontal scaling.*\n"
-            f"* **Persistence**: PostgreSQL + TimescaleDB. *Combines relational integrity with native hyper-table time-series data compression.*"
-        )
+        fallback = generate_fallback_blueprint(prob, org, jury_profile, constraints if constraints else "")
+        architecture = fallback["architecture"]
     
     trace_steps.append({
         "agent": "blueprint",
-        "name": "Enterprise Blueprint Architect",
+        "name": "Principal Architect (Senior Engineer Mode)",
         "status": "completed",
         "duration_ms": int((time.time() - t3) * 1000),
-        "details": f"Generated enterprise architectural topology, Mermaid flowchart, and comparative technology stack."
+        "details": f"Generated 11-section Senior Engineer blueprint with trade-off matrix, failure pre-mortem, and Mermaid system topology."
     })
 
     # -------------------------------------------------------------
@@ -917,57 +768,12 @@ async def playground_generate(req: PlaygroundRequest):
             f"}}"
         )
         pitch_res = llm.invoke(pitch_prompt).content
-        clean_pjson = extract_text_content(pitch_res).strip()
-        if clean_pjson.startswith("```json"):
-            clean_pjson = clean_pjson[7:-3].strip()
-        elif clean_pjson.startswith("```"):
-            clean_pjson = clean_pjson[3:-3].strip()
-        pitch_outline = json.loads(clean_pjson)
+        pitch_outline = parse_json_robustly(pitch_res)
+        if not pitch_outline or not isinstance(pitch_outline, dict):
+            raise ValueError("Parsed pitch JSON is not a valid dictionary")
     except Exception as e:
-        print(f"Pitch outline fallback: {e}")
-        pitch_outline = {
-            "slides": [
-                {
-                    "title": "1. The High-Stakes Problem",
-                    "content": f"Underground mining hazards and early warning demands instant, low-cost sensor intelligence: {prob[:120]}...",
-                    "speaker_notes": "Hook the judges immediately with the real-world danger and economic cost of the problem."
-                },
-                {
-                    "title": "2. Our Solution & Secret Sauce",
-                    "content": "An edge-to-cloud AI early warning mesh with sub-second subsidence prediction and zero-latency audible alarms.",
-                    "speaker_notes": "State the solution in one punchy sentence, emphasizing accessibility and low cost."
-                },
-                {
-                    "title": "3. Enterprise Architecture & Trade-offs",
-                    "content": "Decoupled edge-to-cloud topology with Apache Kafka streaming, TimescaleDB time-series telemetry, and edge-fallback offline mode.",
-                    "speaker_notes": "Walk the technical jury through our architecture flowchart to prove engineering excellence."
-                },
-                {
-                    "title": "4. Field Validation & Metrics",
-                    "content": "Tested against real-world simulated data: 99.4% precision, 45-minute early warning window, 85% hardware cost reduction.",
-                    "speaker_notes": "Show the numbers. Hard quantitative metrics convince the most skeptical judges."
-                },
-                {
-                    "title": "5. Why We Win The Jury",
-                    "content": f"Specifically engineered to meet {org}'s strict rubrics for life safety, low hardware cost, and production scalability.",
-                    "speaker_notes": "Conclude with confidence and invite the judges to test the live demo."
-                }
-            ],
-            "jury_defense_qa": [
-                {
-                    "question": "What happens if underground network connectivity is completely severed?",
-                    "defense": "Our sensor nodes operate an ad-hoc LoRa mesh protocol with localized flash buffering. Alerts trigger locally via hardware sirens immediately, and sync back to cloud TimescaleDB once gateway connection is restored."
-                },
-                {
-                    "question": "How did you keep the hardware cost under ₹15,000 per unit?",
-                    "defense": "We replaced expensive multi-million rupee laser interferometers with high-precision MEMS accelerometers coupled with Kalman filtering on a low-power ESP32 edge microcontroller."
-                },
-                {
-                    "question": "Why did you build this on Next.js and TimescaleDB instead of standard MERN stack?",
-                    "defense": "Telemetry data is strictly time-series with spatial coordinates. TimescaleDB provides 90% hyper-table compression and native SQL range queries, whereas MongoDB requires expensive unindexed scans."
-                }
-            ]
-        }
+        print(f"Pitch outline fallback (generating problem-specific dynamic pitch): {e}")
+        pitch_outline = generate_dynamic_pitch_fallback(prob, org, jury_profile)
     
     trace_steps.append({
         "agent": "pitch",
@@ -1008,19 +814,23 @@ async def edit_architecture(req: EditArchitectureRequest):
     edit_llm = get_llm(req.model or "gemini-3.5-flash-lite", temperature=0.3)
     
     prompt = PromptTemplate.from_template(
-        "You are an Elite Enterprise Technical Architect.\n"
-        "Here is the existing architecture and system flowchart:\n"
+        "You are a Principal Software Engineer (Senior Engineer Mode).\n"
+        "Here is the existing 11-section architectural specification and system flowchart:\n"
         "-----------------------------------------\n"
         "{current_architecture}\n"
         "-----------------------------------------\n\n"
-        "The user requested the following modifications/edits:\n"
+        "The user requested the following architectural modification:\n"
         "\"{edit_instructions}\"\n\n"
+        "SENIOR ENGINEER PRINCIPLES:\n"
+        "- Solve the actual problem, not the most impressive-sounding one.\n"
+        "- Prefer the simplest design that meets requirements and constraints.\n"
+        "- Every component added must survive the question 'what would make this fail?'.\n\n"
         "YOUR TASK:\n"
-        "1. Update the architecture and REDRAW the Mermaid flowchart to strictly incorporate the requested changes.\n"
-        "2. The Mermaid diagram MUST be a complete, self-contained, valid diagram enclosed in a ```mermaid ... ``` code block (use graph TD or flowchart TD).\n"
-        "3. Make sure all modified or newly added components (services, caches, message brokers, databases, edge proxies, workers) and connection arrows with protocol labels are clearly shown.\n"
-        "4. Include an 'Architectural Changes & Rationale' section detailing the exact components added or modified and why.\n"
-        "5. Keep the design production-grade, highly structured, and visually clean."
+        "1. Update the specification while strictly preserving the 11 numbered sections (Goal, Assumptions, Decision, Architecture with Mermaid, Tech choices, Pre-mortem, Scope, Build order, Test plan, Security, Sources).\n"
+        "2. In Section 4 (Architecture), REDRAW the complete Mermaid diagram enclosed in ```mermaid ... ``` using graph TD or flowchart TD reflecting all newly added or modified nodes, edges, and protocols.\n"
+        "3. In Section 5 (Tech choices), add or adjust the table row justifying why this choice won over its alternative.\n"
+        "4. In Section 6 (Pre-mortem), add any new failure mode or risk introduced by this change with concrete mitigation.\n"
+        "5. Output clean, professional GitHub-flavored Markdown."
     )
     
     try:

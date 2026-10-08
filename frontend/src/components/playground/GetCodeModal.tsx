@@ -35,7 +35,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Vantage Multi-Agent Swarm API
-API_URL = "http://localhost:8000/api/playground/generate"
+API_BASE = os.getenv("VANTAGE_API_URL", "http://localhost:8000")
+API_URL = f"{API_BASE}/api/playground/generate"
 
 payload = {
     "organizer_name": "${org.replace(/"/g, '\\"')}",
@@ -54,8 +55,10 @@ print(f"Execution Latency: {data.get('meta', {}).get('total_time_ms')}ms")
 `;
 
   const typescriptCode = `// Next.js / TypeScript API Client
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
 async function generateHackathonStrategy() {
-  const response = await fetch("http://localhost:8000/api/playground/generate", {
+  const response = await fetch(\`\${API_BASE}/api/playground/generate\`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -134,7 +137,7 @@ async function generateHackathonStrategy() {
               <h3 className="text-base font-bold text-white tracking-tight flex items-center gap-2">
                 Get Code
                 <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-accent-pink/10 text-accent-pink border border-accent-pink/20">
-                  Google AI Studio Export
+                  API Client Export
                 </span>
               </h3>
               <p className="text-xs text-muted-on-dark">
