@@ -8,6 +8,7 @@ import { ArrowRight, Eye, EyeOff, History, Lock, Mail, ShieldCheck, Sparkles, Us
 import { useAuth } from "./AuthProvider";
 import GoogleButton from "./GoogleButton";
 import { readQueryParam } from "@/lib/history";
+import { Logo } from "@/components/Logo";
 
 type Mode = "login" | "signup";
 
@@ -97,10 +98,8 @@ export default function AuthForm({ initialMode }: { initialMode: Mode }) {
           <div className="absolute inset-0 bg-dotted-dark opacity-60" />
         </div>
 
-        <Link href="/" className="relative z-10 font-mono text-sm tracking-widest font-bold flex items-center gap-2 w-fit">
-          <div className="w-6 h-6 rounded-[5px] bg-accent-magenta flex items-center justify-center shadow-[0_0_14px_rgba(192,43,214,0.6)]">
-            <div className="w-3 h-3 bg-black rounded-[2px]" />
-          </div>
+        <Link href="/" className="relative z-10 font-mono text-xl tracking-widest font-bold flex items-center gap-3 w-fit">
+          <Logo size={42} />
           VANTAGE
         </Link>
 

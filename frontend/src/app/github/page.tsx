@@ -5,6 +5,7 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { GitBranch, GitCommit, Search, GitPullRequest, AlertTriangle, ShieldCheck } from "lucide-react";
 import { apiFetch } from "@/lib/api";
+import { Logo } from "@/components/Logo";
 
 export default function GithubIntelPage() {
   const [repoUrl, setRepoUrl] = useState("https://github.com/team/hackathon-project");
@@ -106,7 +107,7 @@ export default function GithubIntelPage() {
             
             {loading && (
               <div className="flex-1 flex items-center justify-center">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-slate-500"></div>
+                <Logo loading={true} className="w-16 h-16 mb-4" />
               </div>
             )}
 

@@ -174,39 +174,41 @@ export default function RibbonArt() {
   const [ref, inView] = useInView<HTMLDivElement>({ rootMargin: '200px' });
 
   return (
-    <div ref={ref} className="absolute inset-0 z-0 pointer-events-none opacity-90 mix-blend-screen" style={{ willChange: "transform" }}>
-      {inView && (
-        <Canvas 
-          camera={{ position: [0, 0, 8], fov: 45 }} 
-          dpr={[1, 1.2]} 
-          gl={{ powerPreference: "high-performance", antialias: false, stencil: false }}
-          frameloop="always"
-        >
-          {/* Base ambient lighting */}
-          <ambientLight intensity={0.2} />
-          
-          {/* Dynamic colorful point lights to interact with the physical material */}
-          <pointLight position={[-5, 2, 2]} color="#FF107A" intensity={10} distance={10} />
-          <pointLight position={[5, -2, 2]} color="#7A10FF" intensity={10} distance={10} />
-          <pointLight position={[0, 0, 5]} color="#ffffff" intensity={2} distance={10} />
+    <div 
+      ref={ref} 
+      className="absolute inset-0 z-0 pointer-events-none opacity-90" 
+      style={{ willChange: "transform", transform: "translate3d(0, 0, 0)", backfaceVisibility: "hidden" }}
+    >
+      <Canvas 
+        camera={{ position: [0, 0, 8], fov: 45 }} 
+        dpr={[1, 1.2]} 
+        gl={{ powerPreference: "high-performance", antialias: false, stencil: false }}
+        frameloop={inView ? "always" : "never"}
+      >
+        {/* Base ambient lighting */}
+        <ambientLight intensity={0.2} />
+        
+        {/* Dynamic colorful point lights to interact with the physical material */}
+        <pointLight position={[-5, 2, 2]} color="#FF107A" intensity={10} distance={10} />
+        <pointLight position={[5, -2, 2]} color="#7A10FF" intensity={10} distance={10} />
+        <pointLight position={[0, 0, 5]} color="#ffffff" intensity={2} distance={10} />
 
-          {/* Environment for gorgeous realistic reflections */}
-          <Environment resolution={128}>
-            <group rotation={[-Math.PI / 4, -0.3, 0]}>
-              <Lightformer intensity={4} rotation-y={Math.PI / 2} position={[-5, 1, -1]} scale={[20, 1, 1]} />
-              <Lightformer intensity={4} rotation-y={Math.PI / 2} position={[5, -1, -1]} scale={[20, 1, 1]} />
-              <Lightformer intensity={2} rotation-y={-Math.PI / 2} position={[0, 5, -2]} scale={[20, 1, 1]} />
-            </group>
-          </Environment>
+        {/* Environment for gorgeous realistic reflections */}
+        <Environment resolution={128}>
+          <group rotation={[-Math.PI / 4, -0.3, 0]}>
+            <Lightformer intensity={4} rotation-y={Math.PI / 2} position={[-5, 1, -1]} scale={[20, 1, 1]} />
+            <Lightformer intensity={4} rotation-y={Math.PI / 2} position={[5, -1, -1]} scale={[20, 1, 1]} />
+            <Lightformer intensity={2} rotation-y={-Math.PI / 2} position={[0, 5, -2]} scale={[20, 1, 1]} />
+          </group>
+        </Environment>
 
-          <Ribbons />
-          <FloatingPackets />
-          
-          <EffectComposer enableNormalPass={false} multisampling={0}>
-            <Bloom luminanceThreshold={0.5} intensity={1.0} resolutionScale={0.5} />
-          </EffectComposer>
-        </Canvas>
-      )}
+        <Ribbons />
+        <FloatingPackets />
+        
+        <EffectComposer enableNormalPass={false} multisampling={0}>
+          <Bloom luminanceThreshold={0.5} intensity={1.0} resolutionScale={0.5} />
+        </EffectComposer>
+      </Canvas>
     </div>
   );
 }

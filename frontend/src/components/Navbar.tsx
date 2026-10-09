@@ -4,15 +4,14 @@ import Link from "next/link";
 import { ChevronDown, Grip, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import UserMenu from "@/components/auth/UserMenu";
+import { Logo } from "@/components/Logo";
 
 export default function Navbar() {
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 px-6 py-4 flex items-center justify-between pointer-events-auto bg-black/40 backdrop-blur-md border-b border-white/5">
       {/* Logo */}
-      <Link href="/" className="font-mono text-sm tracking-widest font-bold z-10 flex items-center gap-2 group">
-        <div className="w-5 h-5 rounded-[4px] bg-accent-magenta flex items-center justify-center transition-transform group-hover:scale-110 shadow-[0_0_10px_rgba(192,43,214,0.5)]">
-          <div className="w-2.5 h-2.5 bg-black rounded-[2px]" />
-        </div>
+      <Link href="/" className="font-mono text-xl tracking-widest font-bold z-10 flex items-center gap-3 group">
+        <Logo size={48} className="group-hover:scale-110 transition-transform" />
         VANTAGE
       </Link>
 

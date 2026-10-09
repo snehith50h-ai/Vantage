@@ -6,6 +6,7 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { Users, Activity, Target, ShieldAlert, Sparkles, Plus, Trash2 } from "lucide-react";
 import { apiFetch } from "@/lib/api";
+import { Logo } from "@/components/Logo";
 
 interface TeamMember {
   name: string;
@@ -189,7 +190,7 @@ export default function TeamProfilePage() {
 
             {loading && (
               <div className="h-full min-h-[400px] border border-white/5 rounded-2xl flex flex-col items-center justify-center text-center p-8 bg-[#12121A]/30">
-                <div className="w-10 h-10 border-4 border-accent-pink/30 border-t-accent-pink rounded-full animate-spin mb-4" />
+                <Logo loading={true} className="w-16 h-16 mb-4" />
                 <p className="text-sm text-muted-on-dark font-mono animate-pulse">Mapping evidence to capabilities...</p>
               </div>
             )}

@@ -22,18 +22,19 @@
   
   --font-mono: var(--font-jetbrains);
   --font-sans: var(--font-inter);
-}
+        }
 
 @layer utilities {
   .text-gradient {
     background-image: linear-gradient(
-      -45deg,
-      #FF107A,
-      #7A10FF,
-      #FF5C93,
-      #00E5FF
+      90deg,
+      #FF107A 0%,
+      #7A10FF 30%,
+      #FF5C93 60%,
+      #00E5FF 85%,
+      #FF107A 100%
     );
-    background-size: 150% 150%;
+    background-size: 200% auto;
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
@@ -41,8 +42,8 @@
   }
 
   @keyframes aurora-text {
-    0% { filter: hue-rotate(0deg); }
-    100% { filter: hue-rotate(360deg); }
+    0% { background-position: 0% center; }
+    100% { background-position: 200% center; }
   }
 
   .aurora-flow-gradient {
@@ -71,6 +72,10 @@
     }
   }
 
+  .animate-spin-slow {
+    animation: spin 3s linear infinite;
+  }
+
   /* Wide, thick ambient diffused halo covering area around the entire rectangular box */
   .aurora-halo-ambient {
     position: absolute;
@@ -80,6 +85,8 @@
     opacity: 0.55;
     pointer-events: none;
     transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    will-change: opacity, filter;
+    transform: translateZ(0);
   }
 
   /* Medium bloom hugging the perimeter edges and blended corners smoothly */
@@ -91,6 +98,8 @@
     opacity: 0.75;
     pointer-events: none;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    will-change: opacity, filter;
+    transform: translateZ(0);
   }
 
   /* Crisp all-edge gradient border wrapper covering all 4 sides and corners */
@@ -99,10 +108,12 @@
     padding: 2px;
     border-radius: 1.375rem;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transform: translateZ(0);
   }
 
   .aurora-border {
     position: relative;
+    transform: translateZ(0);
   }
   
   .aurora-border::before {
@@ -123,6 +134,8 @@
     z-index: -1;
     filter: blur(4px);
     opacity: 0.8;
+    will-change: background-position;
+    transform: translateZ(0);
   }
 
   .aurora-border::after {
@@ -141,6 +154,8 @@
     background-size: 200% auto;
     animation: aurora-border-anim 4s linear infinite;
     z-index: -1;
+    will-change: background-position;
+    transform: translateZ(0);
   }
 
   @keyframes aurora-border-anim {
@@ -239,6 +254,40 @@ html, body {
   font-family: var(--font-sans);
   overscroll-behavior-y: auto;
   scroll-behavior: smooth;
+}
+
+html {
+  scroll-behavior: auto !important;
+}
+
+html.lenis, html.lenis body {
+  height: auto;
+}
+
+.lenis.lenis-smooth {
+  scroll-behavior: auto !important;
+}
+
+.lenis.lenis-smooth [data-lenis-prevent] {
+  overscroll-behavior: contain;
+}
+
+.lenis.lenis-stopped {
+  overflow: hidden;
+}
+
+.lenis.lenis-scrolling iframe {
+  pointer-events: none;
+}
+
+* {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+header, nav, [class*="sticky"], [class*="fixed"] {
+  transform: translateZ(0);
+  backface-visibility: hidden;
 }
 
 body {

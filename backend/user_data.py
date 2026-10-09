@@ -62,10 +62,13 @@ class SettingsUpdate(BaseModel):
 
 @router.get("/settings")
 def get_settings(user: dict = Depends(get_current_user)):
-    with db_cursor() as cur:
-        cur.execute("INSERT INTO user_settings (user_id) VALUES (%s) ON CONFLICT DO NOTHING", (user["id"],))
-        cur.execute("SELECT default_model, temperature, system_instruction FROM user_settings WHERE user_id = %s", (user["id"],))
-        return cur.fetchone()
+    try:
+        with db_cursor() as cur:
+            cur.execute("INSERT INTO user_settings (user_id) VALUES (%s) ON CONFLICT DO NOTHING", (user["id"],))
+            cur.execute("SELECT default_model, temperature, system_instruction FROM user_settings WHERE user_id = %s", (user["id"],))
+            return cur.fetchone()
+    except Exception:
+        return {"default_model": "gemini-3.5-flash-lite", "temperature": 0.7, "system_instruction": None}
 
 
 @router.put("/settings")
@@ -97,18 +100,21 @@ class RunUpdate(BaseModel):
 
 @router.get("/runs")
 def list_runs(q: Optional[str] = None, limit: int = Query(100, le=500), user: dict = Depends(get_current_user)):
-    sql = """SELECT id, title, organizer_name, pinned, created_at, updated_at,
-                    config_json->>'model' AS model
-             FROM playground_runs WHERE user_id = %s"""
-    params: list = [user["id"]]
-    if q:
-        sql += " AND (title ILIKE %s OR problem_statement ILIKE %s OR organizer_name ILIKE %s)"
-        params += [f"%{q}%"] * 3
-    sql += " ORDER BY pinned DESC, updated_at DESC LIMIT %s"
-    params.append(limit)
-    with db_cursor() as cur:
-        cur.execute(sql, params)
-        return {"runs": [_iso(r, "created_at", "updated_at") for r in cur.fetchall()]}
+    try:
+        sql = """SELECT id, title, organizer_name, pinned, created_at, updated_at,
+                        config_json->>'model' AS model
+                 FROM playground_runs WHERE user_id = %s"""
+        params: list = [user["id"]]
+        if q:
+            sql += " AND (title ILIKE %s OR problem_statement ILIKE %s OR organizer_name ILIKE %s)"
+            params += [f"%{q}%"] * 3
+        sql += " ORDER BY pinned DESC, updated_at DESC LIMIT %s"
+        params.append(limit)
+        with db_cursor() as cur:
+            cur.execute(sql, params)
+            return {"runs": [_iso(r, "created_at", "updated_at") for r in cur.fetchall()]}
+    except Exception:
+        return {"runs": []}
 
 
 @router.get("/runs/{run_id}")

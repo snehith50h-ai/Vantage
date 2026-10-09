@@ -7,6 +7,7 @@ import { ScrollTrigger } from "gsap/ScrollTrigger";
 gsap.registerPlugin(ScrollTrigger);
 import { Globe, Code, Briefcase, MessageCircle } from "lucide-react";
 import RibbonArt from "./RibbonArt";
+import { Logo } from "@/components/Logo";
 
 export default function Footer() {
   const ctaRef = useRef<HTMLDivElement>(null);
@@ -19,7 +20,7 @@ export default function Footer() {
         animation: gsap.fromTo(
           ".footer-cta-content",
           { y: 40, opacity: 0 },
-          { y: 0, opacity: 1, duration: 0.8, ease: "power3.out" }
+          { y: 0, opacity: 1, duration: 0.8, ease: "power3.out", force3D: true }
         )
       });
     }, ctaRef);
@@ -28,7 +29,7 @@ export default function Footer() {
 
   return (
     <footer className="relative bg-black pt-24 pb-8 px-6 overflow-hidden mt-[-40px] rounded-t-[24px] z-30">
-      <div className="absolute bottom-[-20%] left-0 right-0 h-[600px] opacity-40 pointer-events-none transform rotate-180 mix-blend-screen">
+      <div className="absolute bottom-[-20%] left-0 right-0 h-[600px] opacity-40 pointer-events-none transform rotate-180 will-change-transform">
         <RibbonArt />
       </div>
 
@@ -38,8 +39,9 @@ export default function Footer() {
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-8 mb-24 text-[13px] text-muted-on-dark">
           <div className="col-span-2 lg:col-span-1 mb-8 lg:mb-0 flex flex-col justify-between">
             <div>
-              <div className="font-mono text-sm tracking-widest font-bold text-white mb-6">
-                STRATEGIST
+              <div className="font-mono text-xl tracking-widest font-bold text-white mb-6 flex items-center gap-3">
+                <Logo size={48} />
+                VANTAGE
               </div>
               <p className="max-w-xs leading-relaxed">
                 Production speed without the production complexity.

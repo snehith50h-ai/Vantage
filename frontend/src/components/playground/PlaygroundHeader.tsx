@@ -12,6 +12,7 @@ import {
   ArrowLeft,
 } from "lucide-react";
 import UserMenu from "@/components/auth/UserMenu";
+import { Logo } from "@/components/Logo";
 
 interface PlaygroundHeaderProps {
   title: string;
@@ -62,11 +63,9 @@ export default function PlaygroundHeader({
             <ArrowLeft className="w-4 h-4" />
           </Link>
 
-          <div className="flex items-center gap-2 shrink-0">
-            <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-accent-magenta to-accent-pink flex items-center justify-center shadow-[0_0_12px_rgba(192,43,214,0.5)]">
-              <Sparkles className="w-3.5 h-3.5 text-black" />
-            </div>
-            <span className="font-mono text-sm font-bold tracking-widest text-white leading-none">
+          <div className="flex items-center gap-3 shrink-0">
+            <Logo size={42} />
+            <span className="font-mono text-lg font-bold tracking-widest text-white leading-none">
               VANTAGE
             </span>
           </div>

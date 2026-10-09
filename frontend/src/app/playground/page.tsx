@@ -399,16 +399,9 @@ ${JSON.stringify(result.final_blueprint?.pitch_outline?.slides || result.final_b
             >
               {!result && !loading && (
                 <div className="text-center mb-6 animate-in fade-in slide-in-from-bottom-4 duration-700 relative z-10 max-w-xl mx-auto">
-                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-accent-magenta/10 border border-accent-magenta/30 text-[11px] font-mono text-accent-pink mb-3 shadow-[0_0_12px_rgba(192,43,214,0.3)]">
-                    <Sparkles className="w-3 h-3" />
-                    <span>Autonomous Agentic Swarm</span>
-                  </div>
                   <h1 className="text-3xl md:text-[38px] font-bold tracking-tight text-white mb-2 font-sans">
                     Welcome back, <span className="text-gradient">{userName}</span>
                   </h1>
-                  <p className="text-white/60 text-sm">
-                    Enter any hackathon theme, problem statement, or select a preset to reverse-engineer jury rubrics and synthesize architecture.
-                  </p>
                 </div>
               )}
 
@@ -450,7 +443,7 @@ ${JSON.stringify(result.final_blueprint?.pitch_outline?.slides || result.final_b
                         value={problemStatement}
                         onChange={(e) => setProblemStatement(e.target.value)}
                         placeholder="Describe your hackathon problem, theme guidelines, or system requirements..."
-                        className="w-full min-h-[64px] max-h-[350px] bg-transparent px-4 py-3.5 text-[14px] leading-relaxed text-white placeholder-white/35 focus:outline-none resize-none font-sans"
+                        className="w-full min-h-[64px] max-h-[350px] bg-transparent px-4 py-3.5 text-base leading-relaxed text-white placeholder-white/35 focus:outline-none resize-none font-sans"
                         rows={!result && !loading ? 3 : 2}
                       />
                     </div>

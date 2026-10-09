@@ -2,6 +2,7 @@
 
 import React from "react";
 import { Check, Clock, AlertCircle, Loader2 } from "lucide-react";
+import { Logo } from "@/components/Logo";
 
 export interface TraceStep {
   agent: string;
@@ -78,9 +79,9 @@ export default function AgentExecutionPipeline({
         )}
 
         {loading && (
-          <div className="flex items-center gap-1.5 text-xs font-mono text-accent-pink animate-pulse">
-            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-            <span>Swarm Active...</span>
+          <div className="flex items-center gap-1.5 text-xs font-mono text-accent-pink">
+            <Logo size={20} className="w-5 h-5" loading={true} />
+            <span className="animate-pulse">Swarm Active...</span>
           </div>
         )}
       </div>
