@@ -4,6 +4,7 @@ Authentication: email/password (bcrypt) + Google Sign-In, issuing JWT bearer tok
 import os
 import secrets
 import datetime as dt
+import logging
 from contextlib import contextmanager
 from typing import Optional
 
@@ -19,11 +20,17 @@ from db import get_db_connection
 
 load_dotenv()
 
+log = logging.getLogger("vantage.auth")
+
 ENV_PATH = os.path.join(os.path.dirname(__file__), ".env")
 
 # Persist a JWT secret so sessions survive server restarts.
 JWT_SECRET = os.getenv("JWT_SECRET")
+if JWT_SECRET == "your_jwt_secret_key_here":
+    raise RuntimeError("Configure a unique JWT_SECRET before starting Vantage.")
 if not JWT_SECRET:
+    if os.getenv("RENDER") == "true":
+        raise RuntimeError("Configure a persistent JWT_SECRET in Render.")
     JWT_SECRET = secrets.token_urlsafe(48)
     try:
         set_key(ENV_PATH, "JWT_SECRET", JWT_SECRET)
@@ -110,7 +117,7 @@ def get_current_user(request: Request) -> dict:
             raise HTTPException(status_code=401, detail="User no longer exists")
         return row
     except psycopg2.OperationalError:
-        return {"id": uid, "email": "offline@example.com", "name": "Offline User", "password_hash": "dummy", "created_at": None, "google_sub": None, "avatar_url": None}
+        raise HTTPException(status_code=503, detail="Account service temporarily unavailable.") from None
 
 
 def _session_response(row: dict) -> dict:
@@ -159,11 +166,15 @@ class ResetPasswordRequest(BaseModel):
 def _normalize_email(email: str) -> str:
     try:
         return validate_email(email.strip(), check_deliverability=False).normalized.lower()
-    except EmailNotValidError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    except EmailNotValidError:
+        # The validator's message can quote the address back; keep the client's
+        # own input out of the response body.
+        raise HTTPException(status_code=400, detail="That email address is not valid.")
 
 
 def _check_password_strength(pw: str):
+    if len(pw.encode("utf-8")) > 72:
+        raise HTTPException(status_code=400, detail="Password must be at most 72 bytes.")
     if len(pw) < 8:
         raise HTTPException(status_code=400, detail="Password must be at least 8 characters.")
 
@@ -191,7 +202,7 @@ def register(req: RegisterRequest):
             row = cur.fetchone()
             _ensure_settings(cur, row["id"])
     except psycopg2.OperationalError:
-        row = {"id": "00000000-0000-0000-0000-000000000000", "email": email, "name": (req.name or "").strip() or email.split("@")[0], "password_hash": hash_password(req.password), "created_at": None, "google_sub": None, "avatar_url": None}
+        raise HTTPException(status_code=503, detail="Account service temporarily unavailable.") from None
     return _session_response(row)
 
 
@@ -208,7 +219,7 @@ def login(req: LoginRequest):
                 raise HTTPException(status_code=401, detail="Invalid email or password.")
             cur.execute("UPDATE users SET last_login_at = now() WHERE id = %s", (row["id"],))
     except psycopg2.OperationalError:
-        row = {"id": "00000000-0000-0000-0000-000000000000", "email": email, "name": email.split("@")[0], "password_hash": hash_password(req.password), "created_at": None, "google_sub": None, "avatar_url": None}
+        raise HTTPException(status_code=503, detail="Account service temporarily unavailable.") from None
     return _session_response(row)
 
 
@@ -221,8 +232,12 @@ def google_login(req: GoogleLoginRequest):
 
     try:
         info = id_token.verify_oauth2_token(req.credential, g_requests.Request(), GOOGLE_CLIENT_ID)
-    except ValueError as e:
-        raise HTTPException(status_code=401, detail=f"Invalid Google credential: {e}")
+    except ValueError:
+        # Google's ValueError messages can include the raw token or issuer
+        # details. Log it; tell the client only that the credential was not
+        # accepted.
+        log.warning("Google ID token verification failed", exc_info=True)
+        raise HTTPException(status_code=401, detail="That Google credential was not accepted.")
     if not info.get("email_verified"):
         raise HTTPException(status_code=401, detail="Google email is not verified.")
 
@@ -268,17 +283,14 @@ def forgot_password(req: ForgotPasswordRequest):
     email = _normalize_email(req.email)
     frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000").rstrip("/")
 
+    response = {"ok": True, "message": "If your account exists, check your inbox for reset instructions."}
+
     with db_cursor() as cur:
         cur.execute("SELECT id, email, name FROM users WHERE email = %s", (email,))
         user = cur.fetchone()
 
         if not user:
-            # Generic success message to protect against user enumeration
-            return {
-                "ok": True,
-                "message": "If an account with that email exists, password reset instructions have been sent.",
-                "email_sent": False,
-            }
+            return response
 
         # Invalidate any prior active reset tokens for this user
         cur.execute(
@@ -296,25 +308,8 @@ def forgot_password(req: ForgotPasswordRequest):
         )
 
     reset_url = f"{frontend_url}/reset-password?token={token}"
-    email_res = send_password_reset_email(user["email"], reset_url, user.get("name"))
-
-    resp: dict = {
-        "ok": True,
-        "message": "If an account with that email exists, password reset instructions have been sent.",
-        "email_sent": email_res.get("sent", False),
-        "delivery_mode": email_res.get("mode"),
-    }
-
-    # In dev mode / if SMTP is not configured, provide the reset link directly
-    # so testing and unblocking are immediate
-    if not email_res.get("sent"):
-        resp["dev_reset_url"] = reset_url
-        resp["dev_notice"] = (
-            "SMTP is not configured in backend/.env, so the link was generated and logged to console. "
-            "Click the dev link or configure SMTP in backend/.env to deliver to real inboxes."
-        )
-
-    return resp
+    send_password_reset_email(user["email"], reset_url, user.get("name"))
+    return response
 
 
 @router.get("/verify-reset-token")
@@ -364,7 +359,7 @@ def reset_password(req: ResetPasswordRequest):
             """SELECT t.id, t.user_id, t.expires_at, t.used, u.email, u.name, u.avatar_url, u.google_sub, u.created_at
                FROM password_reset_tokens t
                JOIN users u ON u.id = t.user_id
-               WHERE t.token = %s""",
+               WHERE t.token = %s FOR UPDATE OF t""",
             (clean_token,),
         )
         row = cur.fetchone()

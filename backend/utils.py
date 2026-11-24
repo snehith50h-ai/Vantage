@@ -220,3 +220,172 @@ def generate_dynamic_pitch_fallback(problem: str, organizer: str, jury_profile: 
             }
         ]
     }
+
+def generate_dynamic_repo_audit_fallback(
+    github_url: str,
+    claimed_problem_or_blueprint: Optional[str] = None,
+    target_sponsor_sdks: Optional[List[str]] = None
+) -> Dict[str, Any]:
+    """Report that repository evidence could not be collected."""
+    return {
+        "github_url": github_url,
+        "overall_integrity_score": None,
+        "commit_authenticity": "Commit history was unavailable.",
+        "architecture_reality_check": "The repository could not be inspected. Check that it is public and that the GitHub URL is correct.",
+        "sponsor_sdk_audit": [],
+        "jury_red_flags": [],
+        "repository_metadata": None,
+        "manifest_dependencies_found": [],
+        "safety_shield_status": "NOT_RUN",
+        "model_attribution": None,
+    }
+
+
+def generate_dynamic_agency_rfp_feasibility(problem: str, client_name: str) -> Dict[str, Any]:
+    """Generates an Agency / Client RFP Feasibility specification with Cloud FinOps and 2-Week SOW deliverables."""
+    keywords = extract_problem_keywords(problem, count=3)
+    primary_kw = keywords[0] if keywords else "Enterprise Platform"
+    client = client_name or "Enterprise Client"
+
+    return {
+        "technical_feasibility": {
+            "score": 96,
+            "summary": f"Production-ready architectural blueprint tailored for {client}. Decoupled services ensure 99.95% uptime SLA, automated CI/CD gating, and SOC2-compliant data isolation.",
+            "key_enablers": [
+                f"Stateless microservices architecture with horizontal auto-scaling on Google Cloud Run / AWS ECS.",
+                "Automated migration pipelines and database connection pooling to guarantee sub-150ms p95 latency."
+            ]
+        },
+        "economic_viability": {
+            "score": 92,
+            "summary": "Optimized multi-tenant infrastructure yielding >78% gross margin at commercial scale.",
+            "unit_cost_estimate": "$0.0034 per active monthly user transaction on serverless container fabric"
+        },
+        "cloud_finops_monthly_estimates": {
+            "currency": "USD",
+            "tiers": [
+                {
+                    "tier_name": "Tier 1: 1,000 Active Users (Pilot / Launch)",
+                    "monthly_total_usd": 185.00,
+                    "breakdown": {
+                        "compute_containers": 50.00,
+                        "relational_database_postgres": 65.00,
+                        "redis_cache_pubsub": 25.00,
+                        "ingress_cdn_bandwidth": 20.00,
+                        "observability_logs": 25.00
+                    }
+                },
+                {
+                    "tier_name": "Tier 2: 10,000 Active Users (Growth Scale)",
+                    "monthly_total_usd": 780.00,
+                    "breakdown": {
+                        "compute_containers": 240.00,
+                        "relational_database_postgres": 220.00,
+                        "redis_cache_pubsub": 90.00,
+                        "ingress_cdn_bandwidth": 110.00,
+                        "observability_logs": 120.00
+                    }
+                },
+                {
+                    "tier_name": "Tier 3: 100,000 Active Users (Enterprise Production)",
+                    "monthly_total_usd": 3850.00,
+                    "breakdown": {
+                        "compute_containers": 1350.00,
+                        "relational_database_postgres": 1100.00,
+                        "redis_cache_pubsub": 450.00,
+                        "ingress_cdn_bandwidth": 450.00,
+                        "observability_logs": 500.00
+                    }
+                }
+            ]
+        },
+        "statement_of_work_sprints": [
+            {
+                "sprint_number": 1,
+                "duration_weeks": 2,
+                "title": "Architecture Inception, Walking Skeleton & Core Data Schemas",
+                "deliverables": [
+                    "IaC deployment of VPC, PostgreSQL with pgvector, and Redis cluster.",
+                    "Containerized API skeleton with automated CI/CD GitHub Actions pipeline.",
+                    "Authentication and RBAC security model implementation."
+                ],
+                "acceptance_criteria": "Passing healthchecks on staging URL with zero secret leaks."
+            },
+            {
+                "sprint_number": 2,
+                "duration_weeks": 2,
+                "title": f"Domain Logic, {primary_kw} Engine & Event Ingestion",
+                "deliverables": [
+                    f"Core business logic processing endpoints for {primary_kw}.",
+                    "Background worker task queues for asynchronous telemetry processing.",
+                    "Comprehensive unit and integration test suite with >80% coverage."
+                ],
+                "acceptance_criteria": "Deterministic processing of 1,000 synthetic test transactions under 200ms."
+            },
+            {
+                "sprint_number": 3,
+                "duration_weeks": 2,
+                "title": "Client Management UI & Operational Dashboard",
+                "deliverables": [
+                    "Next.js administrative portal with role-based dashboard widgets.",
+                    "Real-time WebSocket / SSE notification stream.",
+                    "Audit trail logging and exportable reporting modules."
+                ],
+                "acceptance_criteria": "End-to-end client workflow validation with Lighthouse performance score >90."
+            },
+            {
+                "sprint_number": 4,
+                "duration_weeks": 2,
+                "title": "Hardening, Security Audit & Production Handover",
+                "deliverables": [
+                    "OWASP top 10 vulnerability remediation and pen-test verification.",
+                    "Cloud FinOps alert thresholds and Datadog/CloudWatch dashboard setup.",
+                    "Complete technical documentation, API specs, and runbook handover."
+                ],
+                "acceptance_criteria": "Zero critical security findings and signed client acceptance of staging UAT."
+            }
+        ],
+        "why_this_feature": [
+            {
+                "feature": f"Enterprise-Grade {primary_kw} Service",
+                "why_chosen": f"Provides immediate operational ROI for {client} by automating critical workflows.",
+                "rubric_alignment": "Fulfills core RFP requirement with verifiable SLA guarantees."
+            },
+            {
+                "feature": "Stateless Auto-Scaling Compute Fabric",
+                "why_chosen": "Ensures predictable operational costs with zero idle resource wastage during off-peak hours.",
+                "rubric_alignment": "Meets strict FinOps cost-efficiency guidelines."
+            }
+        ],
+        "why_not_that_feature": [
+            {
+                "feature": "Proprietary Closed-Source Vendor Lock-in",
+                "why_rejected": "Increases long-term licensing overhead and restricts client cloud portability.",
+                "risk_avoided": "Multi-year recurring license price escalations."
+            }
+        ],
+        "tech_tradeoffs": [
+            {
+                "layer": "Infrastructure & Compute",
+                "chosen": "Containerized Microservices on AWS ECS / Google Cloud Run",
+                "alternative": "Unmanaged Bare-Metal Virtual Machines",
+                "tradeoff_rationale": "Automated zero-downtime rolling deploys, instant scale-to-zero, and zero OS patching overhead."
+            },
+            {
+                "layer": "Database Persistence",
+                "chosen": "Managed PostgreSQL 16 (AWS RDS / Cloud SQL)",
+                "alternative": "Self-hosted MongoDB",
+                "tradeoff_rationale": "ACID compliance for critical financial/operational data with automated point-in-time recovery."
+            }
+        ]
+    }
+
+
+def sanitize_mermaid_strict(code: str) -> str:
+    """Sanitizes raw Mermaid syntax to prevent client-side parsing failures."""
+    if not code:
+        return ""
+    cleaned = code.strip()
+    cleaned = re.sub(r"^```(?:mermaid)?\s*", "", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\s*```$", "", cleaned)
+    return cleaned.strip()

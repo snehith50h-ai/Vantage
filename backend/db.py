@@ -2,6 +2,7 @@ import os
 import psycopg2
 from pgvector.psycopg2 import register_vector
 from dotenv import load_dotenv
+from app.db.delivery import init_delivery_schema
 
 load_dotenv()
 
@@ -18,7 +19,16 @@ def get_db_connection(register=True):
 
 def init_db():
     conn = get_db_connection(register=False)
-    cur = conn.cursor()
+    try:
+        with conn, conn.cursor() as cur:
+            # Schema initialization also runs on each API replica's first boot.
+            cur.execute("SELECT pg_advisory_xact_lock(410873602)")
+            _init_schema(cur)
+    finally:
+        conn.close()
+
+
+def _init_schema(cur):
     cur.execute("CREATE EXTENSION IF NOT EXISTS vector;")
     
     cur.execute("""
@@ -144,9 +154,24 @@ def init_db():
     """)
     cur.execute("CREATE INDEX IF NOT EXISTS idx_reset_tokens_token ON password_reset_tokens(token);")
 
-    conn.commit()
-    cur.close()
-    conn.close()
+    # Early tester feedback & reviews (MakersWall & PostHog feedback loop)
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS tester_feedback (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            persona VARCHAR(100) NOT NULL,
+            category VARCHAR(50) NOT NULL,
+            rating INTEGER CHECK (rating >= 1 AND rating <= 5),
+            feedback TEXT NOT NULL,
+            author_name VARCHAR(255) DEFAULT 'Early Tester',
+            author_handle VARCHAR(255),
+            upvotes INTEGER DEFAULT 0,
+            created_at TIMESTAMPTZ DEFAULT now()
+        );
+    """)
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_feedback_created ON tester_feedback(created_at DESC);")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_feedback_persona ON tester_feedback(persona);")
+
+    init_delivery_schema(cur)
 
 if __name__ == "__main__":
     init_db()

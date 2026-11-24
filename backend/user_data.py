@@ -4,6 +4,9 @@ Every query is scoped by the authenticated user's id.
 """
 import json
 from typing import Optional, Any, Dict
+from uuid import UUID
+
+import psycopg2
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
@@ -99,7 +102,7 @@ class RunUpdate(BaseModel):
 
 
 @router.get("/runs")
-def list_runs(q: Optional[str] = None, limit: int = Query(100, le=500), user: dict = Depends(get_current_user)):
+def list_runs(q: Optional[str] = Query(None, max_length=255), limit: int = Query(100, ge=1, le=500), user: dict = Depends(get_current_user)):
     try:
         sql = """SELECT id, title, organizer_name, pinned, created_at, updated_at,
                         config_json->>'model' AS model
@@ -113,14 +116,14 @@ def list_runs(q: Optional[str] = None, limit: int = Query(100, le=500), user: di
         with db_cursor() as cur:
             cur.execute(sql, params)
             return {"runs": [_iso(r, "created_at", "updated_at") for r in cur.fetchall()]}
-    except Exception:
-        return {"runs": []}
+    except psycopg2.OperationalError:
+        raise HTTPException(503, "Saved runs are temporarily unavailable.") from None
 
 
 @router.get("/runs/{run_id}")
-def get_run(run_id: str, user: dict = Depends(get_current_user)):
+def get_run(run_id: UUID, user: dict = Depends(get_current_user)):
     with db_cursor() as cur:
-        cur.execute("SELECT * FROM playground_runs WHERE id = %s AND user_id = %s", (run_id, user["id"]))
+        cur.execute("SELECT * FROM playground_runs WHERE id = %s AND user_id = %s", (str(run_id), user["id"]))
         row = cur.fetchone()
     if not row:
         raise HTTPException(status_code=404, detail="Run not found")
@@ -128,7 +131,7 @@ def get_run(run_id: str, user: dict = Depends(get_current_user)):
 
 
 @router.patch("/runs/{run_id}")
-def update_run(run_id: str, req: RunUpdate, user: dict = Depends(get_current_user)):
+def update_run(run_id: UUID, req: RunUpdate, user: dict = Depends(get_current_user)):
     with db_cursor() as cur:
         cur.execute(
             """UPDATE playground_runs SET
@@ -139,7 +142,7 @@ def update_run(run_id: str, req: RunUpdate, user: dict = Depends(get_current_use
                WHERE id = %s AND user_id = %s
                RETURNING id, title, pinned, updated_at""",
             (req.title, req.pinned, json.dumps(req.result_json) if req.result_json is not None else None,
-             run_id, user["id"]),
+             str(run_id), user["id"]),
         )
         row = cur.fetchone()
     if not row:
@@ -148,9 +151,9 @@ def update_run(run_id: str, req: RunUpdate, user: dict = Depends(get_current_use
 
 
 @router.delete("/runs/{run_id}")
-def delete_run(run_id: str, user: dict = Depends(get_current_user)):
+def delete_run(run_id: UUID, user: dict = Depends(get_current_user)):
     with db_cursor() as cur:
-        cur.execute("DELETE FROM playground_runs WHERE id = %s AND user_id = %s", (run_id, user["id"]))
+        cur.execute("DELETE FROM playground_runs WHERE id = %s AND user_id = %s", (str(run_id), user["id"]))
         if cur.rowcount == 0:
             raise HTTPException(status_code=404, detail="Run not found")
     return {"ok": True}
@@ -175,9 +178,9 @@ def list_items(kind: Optional[str] = None, user: dict = Depends(get_current_user
 
 
 @router.get("/items/{item_id}")
-def get_item(item_id: str, user: dict = Depends(get_current_user)):
+def get_item(item_id: UUID, user: dict = Depends(get_current_user)):
     with db_cursor() as cur:
-        cur.execute("SELECT * FROM saved_items WHERE id = %s AND user_id = %s", (item_id, user["id"]))
+        cur.execute("SELECT * FROM saved_items WHERE id = %s AND user_id = %s", (str(item_id), user["id"]))
         row = cur.fetchone()
     if not row:
         raise HTTPException(status_code=404, detail="Item not found")
@@ -185,18 +188,18 @@ def get_item(item_id: str, user: dict = Depends(get_current_user)):
 
 
 @router.patch("/items/{item_id}")
-def rename_item(item_id: str, req: ItemUpdate, user: dict = Depends(get_current_user)):
+def rename_item(item_id: UUID, req: ItemUpdate, user: dict = Depends(get_current_user)):
     with db_cursor() as cur:
-        cur.execute("UPDATE saved_items SET title = %s WHERE id = %s AND user_id = %s", (req.title, item_id, user["id"]))
+        cur.execute("UPDATE saved_items SET title = %s WHERE id = %s AND user_id = %s", (req.title, str(item_id), user["id"]))
         if cur.rowcount == 0:
             raise HTTPException(status_code=404, detail="Item not found")
     return {"ok": True}
 
 
 @router.delete("/items/{item_id}")
-def delete_item(item_id: str, user: dict = Depends(get_current_user)):
+def delete_item(item_id: UUID, user: dict = Depends(get_current_user)):
     with db_cursor() as cur:
-        cur.execute("DELETE FROM saved_items WHERE id = %s AND user_id = %s", (item_id, user["id"]))
+        cur.execute("DELETE FROM saved_items WHERE id = %s AND user_id = %s", (str(item_id), user["id"]))
         if cur.rowcount == 0:
             raise HTTPException(status_code=404, detail="Item not found")
     return {"ok": True}

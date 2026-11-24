@@ -15,7 +15,7 @@ import anyio
 
 from auth import db_cursor, decode_token
 
-RUN_ENDPOINTS = {"/api/strategize", "/api/playground/generate"}
+RUN_ENDPOINTS = {"/api/strategize", "/api/playground/generate", "/api/playground/stream-generate"}
 
 # path -> (kind, field used for the title)
 ITEM_ENDPOINTS = {
@@ -40,6 +40,38 @@ def _title(text, fallback):
     return text[:80] + ("…" if len(text) > 80 else "")
 
 
+def _parse_response_body(path: str, body: bytes):
+    """Turn a response body into the JSON payload the history should store.
+
+    The streaming endpoint answers with Server-Sent Events, so its body is a
+    sequence of ``data: {...}`` frames rather than one JSON document. The
+    artefact the client cares about is the ``result`` frame; everything before
+    it is telemetry.
+    """
+    if not body:
+        return None
+    text = body.decode("utf-8", errors="replace")
+    if path == "/api/playground/stream-generate" or text.lstrip().startswith("data:"):
+        for frame in text.split("\n\n"):
+            frame = frame.strip()
+            if not frame.startswith("data:"):
+                continue
+            payload = frame[len("data:"):].strip()
+            if not payload or payload == "[DONE]":
+                continue
+            try:
+                parsed = json.loads(payload)
+            except ValueError:
+                continue
+            if isinstance(parsed, dict) and parsed.get("type") == "result":
+                return parsed.get("payload")
+        return None
+    try:
+        return json.loads(text)
+    except ValueError:
+        return None
+
+
 def _valid_uuid(v):
     try:
         return str(uuid.UUID(v))
@@ -60,7 +92,10 @@ def _persist(user_id, path, req_json, resp_json, run_id, item_id, latency_ms, st
 
         if path in RUN_ENDPOINTS:
             config = {k: v for k, v in req_json.items() if k not in ("organizer_name", "problem_statement", "title")}
-            title = req_json.get("title") or _title(req_json.get("problem_statement"), "Untitled strategy")
+            student_plan = resp_json.get("student_plan") if isinstance(resp_json, dict) else None
+            student_brief = student_plan.get("brief") if isinstance(student_plan, dict) else None
+            plan_title = student_brief.get("title") if isinstance(student_brief, dict) else None
+            title = req_json.get("title") or _title(plan_title or req_json.get("problem_statement"), "Untitled strategy")
             cur.execute(
                 """INSERT INTO playground_runs (id, user_id, title, organizer_name, problem_statement, config_json, result_json)
                    VALUES (%s, %s, %s, %s, %s, %s, %s)
@@ -126,10 +161,7 @@ class PersistenceMiddleware:
                 req_json = json.loads(req_body or b"{}")
             except ValueError:
                 req_json = {}
-            try:
-                resp_json = json.loads(resp_body) if resp_body else None
-            except ValueError:
-                resp_json = None
+            resp_json = _parse_response_body(path, resp_body)
             try:
                 await anyio.to_thread.run_sync(
                     _persist, user_id, path, req_json, resp_json, run_id, item_id,

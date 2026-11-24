@@ -3,21 +3,22 @@ Email service for Vantage AI Studio.
 Supports:
 1. Standard SMTP (Gmail, Brevo, SendGrid, Amazon SES, Mailgun, etc.)
 2. Resend API (via HTTP)
-3. Local/Development mode (clean console logging and dev token return so flow is testable without SMTP)
+Delivery failures are reported internally.
 """
+from html import escape
 import os
 import smtplib
 import logging
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from typing import Optional, Dict, Any
-import requests
+import httpx
 
 logger = logging.getLogger("auth.email")
 
 
 def _generate_html_template(reset_url: str, user_name: Optional[str] = None) -> str:
-    greeting_name = user_name.strip() if user_name else "there"
+    greeting_name = escape(user_name.strip()) if user_name else "there"
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -148,11 +149,10 @@ def send_password_reset_email(
     Sends a password reset email to the recipient.
     - If RESEND_API_KEY is configured, sends via Resend REST API.
     - If SMTP_HOST and SMTP_USER are configured, sends via standard SMTP.
-    - Otherwise, logs the full reset link to console and returns dev details.
+    - Otherwise, reports that delivery is unavailable.
     """
     resend_api_key = os.getenv("RESEND_API_KEY", "").strip()
     smtp_host = os.getenv("SMTP_HOST", "").strip()
-    smtp_port = int(os.getenv("SMTP_PORT", "587"))
     smtp_user = os.getenv("SMTP_USER", "").strip()
     smtp_password = os.getenv("SMTP_PASSWORD", "").strip()
     from_email = os.getenv("SMTP_FROM_EMAIL", "").strip() or os.getenv("EMAIL_FROM", "").strip()
@@ -161,7 +161,7 @@ def send_password_reset_email(
     if resend_api_key:
         try:
             sender = from_email or "Vantage AI <onboarding@resend.dev>"
-            res = requests.post(
+            res = httpx.post(
                 "https://api.resend.com/emails",
                 headers={
                     "Authorization": f"Bearer {resend_api_key}",
@@ -179,15 +179,16 @@ def send_password_reset_email(
             if res.status_code in (200, 201):
                 return {"sent": True, "mode": "resend", "data": res.json()}
             else:
-                logger.error(f"Resend API error: {res.status_code} {res.text}")
-                return {"sent": False, "mode": "resend_error", "error": res.text, "reset_url": reset_url}
+                logger.error(f"Resend API error: {res.status_code}")
+                return {"sent": False, "mode": "resend_error", "error": res.text}
         except Exception as e:
             logger.error(f"Failed to send email via Resend: {e}")
-            return {"sent": False, "mode": "resend_exception", "error": str(e), "reset_url": reset_url}
+            return {"sent": False, "mode": "resend_exception", "error": str(e)}
 
     # 2. SMTP
     if smtp_host and smtp_user:
         try:
+            smtp_port = int(os.getenv("SMTP_PORT", "587"))
             sender = from_email or smtp_user
             msg = MIMEMultipart("alternative")
             msg["Subject"] = "Reset your Vantage AI password"
@@ -219,21 +220,7 @@ def send_password_reset_email(
             return {"sent": True, "mode": "smtp", "recipient": to_email}
         except Exception as e:
             logger.error(f"Failed to send email via SMTP: {e}")
-            print(f"\n[SMTP ERROR]: {e}")
-            print(f"Fallback Reset Link for {to_email}: {reset_url}\n")
-            return {"sent": False, "mode": "smtp_error", "error": str(e), "reset_url": reset_url}
+            return {"sent": False, "mode": "smtp_error", "error": str(e)}
 
-    # 3. Development / Local Mode fallback
-    print("\n" + "=" * 70)
-    print("[PASSWORD RESET LINK GENERATED - LOCAL / DEV MODE]")
-    print(f"   Recipient: {to_email}")
-    print(f"   Reset URL: {reset_url}")
-    print("   (To deliver to real inboxes, configure SMTP_HOST/SMTP_USER or RESEND_API_KEY in backend/.env)")
-    print("=" * 70 + "\n")
-
-    return {
-        "sent": False,
-        "mode": "dev_console",
-        "reason": "SMTP or Resend not configured. Link generated for local testing.",
-        "reset_url": reset_url,
-    }
+    logger.warning("Password reset email delivery is not configured")
+    return {"sent": False, "mode": "unconfigured"}

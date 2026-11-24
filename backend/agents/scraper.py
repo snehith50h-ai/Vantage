@@ -1,12 +1,19 @@
+from __future__ import annotations
+
 import os
 import re
 import json
+from typing import TYPE_CHECKING
+from urllib.parse import parse_qs, urlsplit
+
 import httpx
 from bs4 import BeautifulSoup
-from state import HackathonState
 from db import get_db_connection
 from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
 from dotenv import load_dotenv
+
+if TYPE_CHECKING:
+    from state import HackathonState
 
 load_dotenv()
 
@@ -17,7 +24,19 @@ def get_llm():
         temperature=0.3
     )
 
-def search_duckduckgo(query: str, max_results: int = 4):
+def _search_result_url(value: str) -> str:
+    try:
+        url = urlsplit(value)
+        if url.hostname in {"duckduckgo.com", "html.duckduckgo.com"} and url.path.rstrip("/") == "/l":
+            url = urlsplit(parse_qs(url.query).get("uddg", [""])[0])
+        if url.scheme in {"http", "https"} and url.hostname and not url.username and not url.password:
+            return url._replace(fragment="").geturl()
+    except ValueError:
+        pass
+    return ""
+
+
+def search_duckduckgo(query: str, max_results: int = 4, *, strict: bool = False):
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
     }
@@ -30,20 +49,26 @@ def search_duckduckgo(query: str, max_results: int = 4):
             timeout=8.0,
             follow_redirects=True
         )
+        if strict and resp.status_code != 200:
+            raise RuntimeError("Web search provider unavailable")
         if resp.status_code == 200:
             soup = BeautifulSoup(resp.text, "html.parser")
+            if strict and soup.select_one('form[action*="anomaly"]'):
+                raise RuntimeError("Web search provider unavailable")
             for result in soup.find_all("div", class_="result__body")[:max_results]:
                 title_elem = result.find("h2")
                 snippet_elem = result.find("a", class_="result__snippet")
-                url_elem = result.find("a", class_="result__url")
+                url_elem = result.find("a", class_="result__a") or result.find("a", class_="result__url")
                 
                 title = title_elem.get_text(strip=True) if title_elem else ""
                 snippet = snippet_elem.get_text(strip=True) if snippet_elem else ""
-                url = url_elem.get("href", "") if url_elem else ""
+                url = _search_result_url(str(url_elem.get("href", ""))) if url_elem else ""
                 
-                if title and snippet:
+                if title and url:
                     results.append({"title": title, "snippet": snippet, "url": str(url)})
     except Exception as e:
+        if strict:
+            raise
         print(f"Scraper web search warning: {e}")
     return results
 

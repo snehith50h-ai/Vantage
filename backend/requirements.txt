@@ -25,3 +25,11 @@ beautifulsoup4==4.15.0
 python-dotenv==1.2.4
 email-validator==2.3.0
 anyio==4.15.1
+
+# Minimum patched versions of transitive runtime dependencies
+certifi>=2026.10.18
+dnspython>=2.9.2
+langgraph-sdk>=0.4.6,<0.5
+opentelemetry-api>=1.45.2
+pyasn1>=0.6.5
+soupsieve>=3.0.2
