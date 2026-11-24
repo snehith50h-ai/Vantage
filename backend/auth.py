@@ -149,6 +149,7 @@ class RegisterRequest(BaseModel):
 class LoginRequest(BaseModel):
     email: str
     password: str
+    github_link_token: Optional[str] = Field(default=None, max_length=2048)
 
 
 class GoogleLoginRequest(BaseModel):
@@ -231,6 +232,26 @@ def login(req: LoginRequest):
                 if row and not row.get("password_hash") and row.get("github_sub"):
                     raise HTTPException(status_code=401, detail="This account uses GitHub sign-in.")
                 raise HTTPException(status_code=401, detail="Invalid email or password.")
+            if req.github_link_token:
+                try:
+                    link = jwt.decode(req.github_link_token, JWT_SECRET, algorithms=[JWT_ALG], audience="github-account-link",
+                                      options={"require": ["exp", "account_id", "github_id"]})
+                except jwt.PyJWTError:
+                    raise HTTPException(status_code=400, detail="GitHub confirmation expired. Start GitHub sign-in again.") from None
+                if link["account_id"] != str(row["id"]):
+                    raise HTTPException(status_code=400, detail="Use the Vantage account that matches your verified GitHub email.")
+                try:
+                    cur.execute(
+                        """UPDATE users SET github_sub = %s
+                           WHERE id = %s AND password_hash = %s AND (github_sub IS NULL OR github_sub = %s)
+                           RETURNING *""",
+                        (link["github_id"], row["id"], row["password_hash"], link["github_id"]),
+                    )
+                    row = cur.fetchone()
+                except psycopg2.errors.UniqueViolation:
+                    raise HTTPException(status_code=409, detail="This GitHub identity is already linked to a Vantage account.") from None
+                if not row:
+                    raise HTTPException(status_code=409, detail="Could not link GitHub to this account. Start GitHub sign-in again.")
             cur.execute("UPDATE users SET last_login_at = now() WHERE id = %s", (row["id"],))
     except psycopg2.OperationalError:
         raise HTTPException(status_code=503, detail="Account service temporarily unavailable.") from None
@@ -322,7 +343,23 @@ def github_login(req: GitHubLoginRequest):
                 cur.execute("SELECT * FROM users WHERE github_sub = %s", (github_id,))
                 row = cur.fetchone()
         if not row:
-            raise HTTPException(status_code=409, detail="This email already has a Vantage account. Sign in using its original method.")
+            cur.execute("SELECT id, github_sub FROM users WHERE email = %s", (email,))
+            existing = cur.fetchone()
+            if not existing or existing.get("github_sub") is not None:
+                raise HTTPException(status_code=409, detail="This email is already associated with another GitHub identity.")
+            return {
+                "existing_email": email,
+                "github_link_token": jwt.encode(
+                    {
+                        "aud": "github-account-link",
+                        "account_id": str(existing["id"]),
+                        "github_id": github_id,
+                        "exp": dt.datetime.now(dt.timezone.utc) + dt.timedelta(minutes=10),
+                    },
+                    JWT_SECRET,
+                    algorithm=JWT_ALG,
+                ),
+            }
         cur.execute("UPDATE users SET last_login_at = now() WHERE id = %s", (row["id"],))
         _ensure_settings(cur, row["id"])
     return _session_response(row)
