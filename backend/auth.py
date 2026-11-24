@@ -9,12 +9,13 @@ from contextlib import contextmanager
 from typing import Optional
 
 import bcrypt
+import httpx
 import jwt
 import psycopg2.extras
 from dotenv import load_dotenv, set_key
 from email_validator import validate_email, EmailNotValidError
 from fastapi import APIRouter, Depends, HTTPException, Request
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from db import get_db_connection
 
@@ -39,6 +40,11 @@ if not JWT_SECRET:
 JWT_ALG = "HS256"
 JWT_TTL_DAYS = int(os.getenv("JWT_TTL_DAYS", "30"))
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")
+GITHUB_CLIENT_ID = os.getenv("GITHUB_OAUTH_CLIENT_ID", "")
+GITHUB_CLIENT_SECRET = os.getenv("GITHUB_OAUTH_CLIENT_SECRET", "")
+GITHUB_REDIRECT_URI = os.getenv("GITHUB_OAUTH_REDIRECT_URI") or (
+    os.getenv("FRONTEND_URL", "http://127.0.0.1:3000").rstrip("/") + "/login"
+)
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -149,6 +155,11 @@ class GoogleLoginRequest(BaseModel):
     credential: str  # Google Identity Services ID token
 
 
+class GitHubLoginRequest(BaseModel):
+    code: str = Field(min_length=1, max_length=200)
+    verifier: str = Field(pattern=r"^[A-Za-z0-9._~-]{43,128}$")
+
+
 class ChangePasswordRequest(BaseModel):
     current_password: Optional[str] = None
     new_password: str
@@ -182,7 +193,8 @@ def _check_password_strength(pw: str):
 # ---------------------------------------------------------------- routes
 @router.get("/config")
 def auth_config():
-    return {"google_client_id": GOOGLE_CLIENT_ID or None}
+    github = {"client_id": GITHUB_CLIENT_ID, "redirect_uri": GITHUB_REDIRECT_URI} if GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET else None
+    return {"google_client_id": GOOGLE_CLIENT_ID or None, "github": github}
 
 
 @router.post("/register")
@@ -216,6 +228,8 @@ def login(req: LoginRequest):
             if not row or not verify_password(req.password, row.get("password_hash")):
                 if row and not row.get("password_hash") and row.get("google_sub"):
                     raise HTTPException(status_code=401, detail="This account uses Google Sign-In.")
+                if row and not row.get("password_hash") and row.get("github_sub"):
+                    raise HTTPException(status_code=401, detail="This account uses GitHub sign-in.")
                 raise HTTPException(status_code=401, detail="Invalid email or password.")
             cur.execute("UPDATE users SET last_login_at = now() WHERE id = %s", (row["id"],))
     except psycopg2.OperationalError:
@@ -259,6 +273,57 @@ def google_login(req: GoogleLoginRequest):
                 (email, sub, info.get("name"), info.get("picture")),
             )
         row = cur.fetchone()
+        _ensure_settings(cur, row["id"])
+    return _session_response(row)
+
+
+@router.post("/github")
+def github_login(req: GitHubLoginRequest):
+    if not (GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET):
+        raise HTTPException(status_code=503, detail="GitHub sign-in is not configured.")
+    try:
+        with httpx.Client(timeout=10, headers={"Accept": "application/json"}) as client:
+            result = client.post("https://github.com/login/oauth/access_token", data={
+                "client_id": GITHUB_CLIENT_ID,
+                "client_secret": GITHUB_CLIENT_SECRET,
+                "code": req.code,
+                "code_verifier": req.verifier,
+                "redirect_uri": GITHUB_REDIRECT_URI,
+            })
+            result.raise_for_status()
+            token = result.json().get("access_token")
+            if not token:
+                raise HTTPException(status_code=401, detail="GitHub sign-in expired. Please try again.")
+            headers = {"Authorization": f"Bearer {token}"}
+            identity = client.get("https://api.github.com/user", headers=headers)
+            identity.raise_for_status()
+            profile = identity.json()
+            emails = client.get("https://api.github.com/user/emails", headers=headers)
+            emails.raise_for_status()
+            primary = next((item["email"] for item in emails.json() if item.get("verified") and item.get("primary")), None)
+    except (httpx.HTTPError, ValueError, KeyError, TypeError):
+        raise HTTPException(status_code=502, detail="GitHub sign-in was temporarily unavailable.") from None
+
+    github_id = profile.get("id")
+    if type(github_id) is not int or not primary:
+        raise HTTPException(status_code=401, detail="Verify your primary email on GitHub first.")
+    email = _normalize_email(primary)
+    with db_cursor() as cur:
+        cur.execute("SELECT * FROM users WHERE github_sub = %s", (github_id,))
+        row = cur.fetchone()
+        if not row:
+            cur.execute(
+                """INSERT INTO users (email, github_sub, name, last_login_at)
+                   VALUES (%s, %s, %s, now()) ON CONFLICT DO NOTHING RETURNING *""",
+                (email, github_id, str(profile.get("name") or profile.get("login") or "")[:255]),
+            )
+            row = cur.fetchone()
+            if not row:
+                cur.execute("SELECT * FROM users WHERE github_sub = %s", (github_id,))
+                row = cur.fetchone()
+        if not row:
+            raise HTTPException(status_code=409, detail="This email already has a Vantage account. Sign in using its original method.")
+        cur.execute("UPDATE users SET last_login_at = now() WHERE id = %s", (row["id"],))
         _ensure_settings(cur, row["id"])
     return _session_response(row)
 

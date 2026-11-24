@@ -85,6 +85,8 @@ def _init_schema(cur):
             last_login_at TIMESTAMPTZ
         );
     """)
+    cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS github_sub BIGINT")
+    cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS users_github_sub_unique ON users (github_sub)")
 
     cur.execute("""
         CREATE TABLE IF NOT EXISTS user_settings (
